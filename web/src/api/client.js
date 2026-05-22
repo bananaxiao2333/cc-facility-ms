@@ -46,3 +46,7 @@ export function post(path, body) {
 export function get(path) {
   return request(path);
 }
+
+export function patch(path, body) {
+  return request(path, { method: 'PATCH', body });
+}

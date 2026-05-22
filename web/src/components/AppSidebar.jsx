@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Icon, Button } from '@blueprintjs/core';
+import { Icon, Button, Popover, Position } from '@blueprintjs/core';
 import { useAuth } from '../context/AuthContext';
+import UserProfilePanel from './UserProfilePanel';
 
 const NAV_ITEMS = [
   { to: '/', icon: 'dashboard', label: 'Dashboard' },
@@ -40,10 +41,17 @@ export default function AppSidebar({ mode, onToggleTheme }) {
 
       <div className="app-sidebar-footer">
         {user && (
-          <div className="app-sidebar-user">
-            <Icon icon="user" />
-            <span>{user.displayName || user.username}</span>
-          </div>
+          <Popover
+            position={Position.RIGHT_TOP}
+            content={<UserProfilePanel />}
+            minimal
+            popoverClassName="user-profile-popover"
+          >
+            <button className="app-sidebar-user">
+              <Icon icon="user" />
+              <span>{user.displayName || user.username}</span>
+            </button>
+          </Popover>
         )}
         <Button
           icon={meta.icon}
