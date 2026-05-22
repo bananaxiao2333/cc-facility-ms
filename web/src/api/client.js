@@ -1,5 +1,13 @@
 const BASE = import.meta.env.VITE_API_BASE ?? '';
 
+let _start = null;
+let _finish = null;
+
+export function setLoadingNotifier(start, finish) {
+  _start = start;
+  _finish = finish;
+}
+
 function getToken() {
   return localStorage.getItem('cc-facility-token');
 }
@@ -10,19 +18,25 @@ async function request(path, options = {}) {
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  const rid = _start?.(path);
 
-  const data = await res.json();
+  try {
+    const res = await fetch(`${BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
-  if (!res.ok) {
-    throw new Error(data.message || `Request failed (${res.status})`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || `Request failed (${res.status})`);
+    }
+
+    return data;
+  } finally {
+    _finish?.(rid);
   }
-
-  return data;
 }
 
 export function post(path, body) {
