@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { ApiLoadingProvider } from './context/ApiLoadingContext';
 import ApiLoadingBridge from './components/ApiLoadingBridge';
@@ -10,12 +11,14 @@ import router from './router';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ApiLoadingProvider>
-      <AuthProvider>
-        <ApiLoadingBridge />
-        <GlobalLoading />
-        <RouterProvider router={router} />
-      </AuthProvider>
-    </ApiLoadingProvider>
+    <ThemeProvider>
+      <ApiLoadingProvider>
+        <AuthProvider>
+          <ApiLoadingBridge />
+          <GlobalLoading />
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ApiLoadingProvider>
+    </ThemeProvider>
   </StrictMode>,
 );

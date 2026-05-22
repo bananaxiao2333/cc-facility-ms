@@ -1,10 +1,10 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Icon, Button, Popover, Position } from '@blueprintjs/core';
+import { Icon, Button } from '@blueprintjs/core';
 import { useAuth } from '../context/AuthContext';
-import UserProfilePanel from './UserProfilePanel';
 
 const NAV_ITEMS = [
   { to: '/', icon: 'dashboard', label: 'Dashboard' },
+  { to: '/profile', icon: 'user', label: 'Profile' },
 ];
 
 const MODE_META = {
@@ -13,16 +13,25 @@ const MODE_META = {
   dark:  { icon: 'moon',         label: 'Dark' },
 };
 
-export default function AppSidebar({ mode, onToggleTheme }) {
+export default function AppSidebar({ mode, onToggleTheme, open, onClose }) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const meta = MODE_META[mode];
 
   return (
-    <aside className="app-sidebar">
-      <h2 className="app-sidebar-title">
-        <img src="/favicon.png" alt="" /> CC Facility
-      </h2>
+    <aside className={'app-sidebar' + (open ? ' app-sidebar--open' : '')}>
+      <div className="app-sidebar-header">
+        <h2 className="app-sidebar-title">
+          <img src="/favicon.png" alt="" /> CC Facility
+        </h2>
+        <Button
+          icon="cross"
+          minimal
+          small
+          className="app-sidebar-close"
+          onClick={onClose}
+        />
+      </div>
 
       {NAV_ITEMS.map(({ to, icon, label }) => {
         const active = location.pathname === to;
@@ -32,6 +41,7 @@ export default function AppSidebar({ mode, onToggleTheme }) {
             to={to}
             end
             className={'app-sidebar-link' + (active ? ' app-sidebar-link--active' : '')}
+            onClick={onClose}
           >
             <Icon icon={icon} />
             {label}
@@ -41,17 +51,14 @@ export default function AppSidebar({ mode, onToggleTheme }) {
 
       <div className="app-sidebar-footer">
         {user && (
-          <Popover
-            position={Position.RIGHT_TOP}
-            content={<UserProfilePanel />}
-            minimal
-            popoverClassName="user-profile-popover"
+          <NavLink
+            to="/profile"
+            className={({ isActive }) => 'app-sidebar-user' + (isActive ? ' app-sidebar-user--active' : '')}
+            onClick={onClose}
           >
-            <button className="app-sidebar-user">
-              <Icon icon="user" />
-              <span>{user.displayName || user.username}</span>
-            </button>
-          </Popover>
+            <Icon icon="user" />
+            <span>{user.displayName || user.username}</span>
+          </NavLink>
         )}
         <Button
           icon={meta.icon}

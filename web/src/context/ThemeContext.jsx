@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+
+const ThemeContext = createContext(null);
 
 const KEY = 'cc-facility-theme';
 const MODES = ['auto', 'light', 'dark'];
@@ -13,9 +15,8 @@ function getInitial() {
   return 'auto';
 }
 
-export default function useTheme() {
+export function ThemeProvider({ children }) {
   const [mode, setMode] = useState(getInitial);
-
   const dark = mode === 'dark' || (mode === 'auto' && getSystemDark());
 
   useEffect(() => {
@@ -40,5 +41,13 @@ export default function useTheme() {
     });
   }, []);
 
-  return { mode, dark, cycle };
+  return (
+    <ThemeContext.Provider value={{ mode, dark, cycle }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  return useContext(ThemeContext);
 }

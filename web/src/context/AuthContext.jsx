@@ -17,7 +17,11 @@ export function AuthProvider({ children }) {
     }
     fetchMe()
       .then((data) => setUser(data.user))
-      .catch(() => localStorage.removeItem(TOKEN_KEY))
+      .catch((err) => {
+        if (err.status === 401) {
+          localStorage.removeItem(TOKEN_KEY);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 

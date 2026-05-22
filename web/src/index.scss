@@ -18,6 +18,87 @@ body {
   color: $pt-dark-text-color;
 }
 
+// ---- Layout ----
+.app-layout {
+  display: flex;
+  height: 100vh;
+}
+
+.app-main {
+  flex: 1;
+  padding: 24px;
+  overflow: auto;
+}
+
+.app-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  min-height: 32px;
+}
+
+.app-breadcrumb-desktop {
+  flex: 1;
+  min-width: 0;
+
+  .bp6-breadcrumbs {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+}
+
+.app-breadcrumb-mobile {
+  display: none;
+  overflow: hidden;
+
+  .bp6-breadcrumbs {
+    flex-wrap: nowrap;
+  }
+}
+
+.app-topbar-brand {
+  display: none;
+  align-items: center;
+  gap: 8px;
+
+  img {
+    width: 24px;
+    height: 24px;
+    border-radius: 2px;
+  }
+
+  span {
+    font-size: 16px;
+    font-weight: 600;
+    color: $pt-heading-color;
+  }
+}
+
+.bp6-dark .app-topbar-brand span {
+  color: $pt-dark-heading-color;
+}
+
+.app-hamburger {
+  display: none;
+}
+
+.app-sidebar-backdrop {
+  display: none;
+}
+
+.app-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-sidebar-close {
+  display: none;
+  color: $gray5 !important;
+}
+
+// ---- Sidebar ----
 .app-sidebar {
   width: 220px;
   background: $dark-gray2;
@@ -26,6 +107,65 @@ body {
   flex-direction: column;
   gap: 4px;
   flex-shrink: 0;
+}
+
+// ---- Mobile ----
+@media (max-width: 768px) {
+  .app-hamburger {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .app-breadcrumb-desktop {
+    display: none;
+  }
+
+  .app-breadcrumb-mobile {
+    display: block;
+  }
+
+  .app-topbar-brand {
+    display: flex;
+    margin-left: auto;
+  }
+
+  .app-topbar {
+    margin-bottom: 4px;
+  }
+
+  .app-main {
+    padding: 12px 16px;
+  }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+
+    &.app-sidebar--open {
+      transform: translateX(0);
+    }
+  }
+
+  .app-sidebar-close {
+    display: inline-flex;
+  }
+
+  .app-sidebar-title {
+    display: none !important;
+  }
+
+  .app-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 999;
+  }
 }
 
 .app-sidebar-title {
@@ -79,38 +219,284 @@ body {
   padding: 8px 8px;
   color: $gray5;
   font-size: 13px;
-  border: none;
   border-bottom: 1px solid $dark-gray3;
   margin-bottom: 8px;
-  background: none;
-  cursor: pointer;
-  width: 100%;
+  text-decoration: none;
   border-radius: 4px;
   transition: background 0.15s;
 
   &:hover {
     background: rgba(255, 255, 255, 0.08);
   }
+
+  &.app-sidebar-user--active {
+    background: rgba(255, 255, 255, 0.15);
+    color: $white;
+  }
 }
 
 // ---- User Profile Panel ----
-.profile-info {
-  margin-bottom: 4px;
-}
-
-.profile-info-row {
+// ---- Login Page ----
+.login-page {
   display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.login-card-wrapper {
+  width: 100%;
+}
+
+.login-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.login-header-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+}
+
+.login-header-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: $pt-heading-color;
+}
+
+.bp6-dark .login-header-title {
+  color: $pt-dark-heading-color;
+}
+
+.login-theme-toggle {
+  margin-top: 16px;
+}
+
+// ---- Profile Page ----
+.profile-page {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+// Username — absolute, huge stroke text, rotated -90deg
+.profile-username-abs {
+  position: absolute;
+  left: -32px;
+  top: 20px;
+  font-size: 96px;
+  font-weight: 800;
+  letter-spacing: 12px;
+  color: transparent;
+  -webkit-text-stroke: 2px $pt-text-color;
+  text-stroke: 2px $pt-text-color;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  opacity: 0.12;
+
+  @media (max-width: 768px) {
+    font-size: 48px;
+    left: 4px;
+    opacity: 0.08;
+  }
+}
+
+.bp6-dark .profile-username-abs {
+  -webkit-text-stroke-color: $pt-dark-text-color;
+  text-stroke-color: $pt-dark-text-color;
+  opacity: 0.08;
+}
+
+// Main body
+.profile-body {
+  position: relative;
+  z-index: 1;
+  padding-left: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+
+  @media (max-width: 768px) {
+    padding-left: 52px;
+  }
+}
+
+.profile-id-block {
+  text-align: left;
+  background: $pt-text-color;
+  padding: 14px 24px;
+  margin-left: 12px;
+
+  .profile-id-text {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    color: $pt-app-background-color;
+    letter-spacing: 2px;
+    word-break: break-all;
+    max-width: 480px;
+  }
+
+  .profile-role-text {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: $pt-app-background-color;
+    opacity: 0.6;
+    letter-spacing: 2px;
+    margin-top: 2px;
+  }
+}
+
+.bp6-dark .profile-id-block {
+  background: $pt-dark-text-color;
+  .profile-id-text,
+  .profile-role-text { color: $pt-dark-app-background-color; }
+}
+
+.profile-three-lines {
+  width: 80px;
+  margin: 16px 0 20px 12px;
+  height: 18px;
+  background:
+    linear-gradient($pt-text-color, $pt-text-color) 0 0 / 100% 2px no-repeat,
+    linear-gradient($pt-text-color, $pt-text-color) 0 8px / 100% 2px no-repeat,
+    linear-gradient($pt-text-color, $pt-text-color) 0 16px / 100% 2px no-repeat;
+}
+
+.bp6-dark .profile-three-lines {
+  background:
+    linear-gradient($pt-dark-text-color, $pt-dark-text-color) 0 0 / 100% 2px no-repeat,
+    linear-gradient($pt-dark-text-color, $pt-dark-text-color) 0 8px / 100% 2px no-repeat,
+    linear-gradient($pt-dark-text-color, $pt-dark-text-color) 0 16px / 100% 2px no-repeat;
+}
+
+.profile-group-desc {
   font-size: 14px;
-}
-
-.profile-info-label {
+  line-height: 1.7;
   color: $pt-text-color-muted;
+  text-align: justify;
+  margin: 0 0 20px 12px;
 }
 
-.bp6-dark .profile-info-label {
+.bp6-dark .profile-group-desc {
   color: $pt-dark-text-color-muted;
+}
+
+// Favicon — between desc and params, right aligned
+.profile-favicon-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.profile-favicon {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  opacity: 0.5;
+}
+
+// Params section
+.profile-params {
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+}
+
+.profile-params-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: $pt-text-color-muted;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid $gray4;
+}
+
+.bp6-dark .profile-params-title {
+  color: $pt-dark-text-color-muted;
+  border-color: $dark-gray4;
+}
+
+.profile-params-table {
+  display: flex;
+  align-items: stretch;
+}
+
+.profile-params-col {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+
+.profile-params-head {
+  color: $pt-text-color-muted;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bp6-dark .profile-params-head {
+  color: $pt-dark-text-color-muted;
+}
+
+.profile-params-val {
+  font-size: 13px;
+}
+
+.profile-params-sep {
+  width: 1px;
+  background: $gray4;
+  margin: 0 10px;
+}
+
+.bp6-dark .profile-params-sep {
+  background: $dark-gray4;
+}
+
+// Actions section — title on the line, same as Parameters
+.profile-actions-section {
+  margin-top: 32px;
+}
+
+.profile-actions-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: $pt-text-color-muted;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid $gray4;
+}
+
+.bp6-dark .profile-actions-title {
+  color: $pt-dark-text-color-muted;
+  border-color: $dark-gray4;
+}
+
+.profile-actions {
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 // ---- Global Loading Overlay ----
