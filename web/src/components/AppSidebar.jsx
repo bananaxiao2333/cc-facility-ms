@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/groups', icon: 'people', label: 'Groups' },
   { to: '/actions', icon: 'cube', label: 'Actions' },
   { to: '/workflows', icon: 'flows', label: 'Workflows' },
+  { to: '/ops', icon: 'console', label: 'Ops' },
   { to: '/profile', icon: 'user', label: 'Profile' },
 ];
 

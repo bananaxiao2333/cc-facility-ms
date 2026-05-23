@@ -2,16 +2,19 @@ import { json, handleError, onRequestOptions } from "../../lib/response.js";
 import { requireNodeAuth } from "../../lib/auth.js";
 import { pollCommand, getNextWorkflowAction, recordEvent } from "../../lib/database.js";
 
-// GET /api/cluster/poll?node=<nodeId>
-// POST /api/cluster/poll — manually trigger a workflow
+// POST /api/cluster/poll — manually trigger a workflow (web UI, user auth)
+import { requireAuth } from "../../lib/auth.js";
 import { startWorkflowRun } from "../../lib/database.js";
 
 export async function onRequestPost(context) {
   try {
-    const node = await requireNodeAuth(context.request);
+    const ctx = {};
+    await requireAuth(context.request, ctx);
     const body = await context.request.json();
+    const nodeId = new URL(context.request.url).searchParams.get("node");
+    if (!nodeId) return json({ message: "Missing node param" }, 400);
     if (body.workflowId) {
-      await startWorkflowRun(node.id, body.workflowId);
+      await startWorkflowRun(nodeId, body.workflowId);
       return json({ ok: true, message: "Workflow triggered" });
     }
     return json({ message: "Missing workflowId" }, 400);

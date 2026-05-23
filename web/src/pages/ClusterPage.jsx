@@ -1,12 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Intent, Tag, Dialog, DialogBody, DialogFooter, FormGroup, InputGroup, HTMLSelect } from '@blueprintjs/core';
-import { fetchNodes, fetchNodesSilent, sendCommand, registerNode, deleteNode, updateNode, triggerWorkflow } from '../api/cluster';
+import { fetchNodes, fetchNodesSilent, registerNode, deleteNode, updateNode } from '../api/cluster';
 import { fetchGroups } from '../api/groups';
-import { fetchWorkflows, updateWorkflow } from '../api/workflows';
 import { useToast } from '../context/ToastContext';
 import clientUrl from '@cc/ccfms-client.lua?url';
-
-const STATUS_COLORS = { online: '#15b371', offline: '#cd4246', maintenance: '#c87619' };
 
 function groupName(groups, groupId) {
   if (!groupId) return '—';
@@ -17,13 +14,9 @@ function groupName(groups, groupId) {
 export default function ClusterPage() {
   const [nodes, setNodes] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [workflows, setWorkflows] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [cmdInput, setCmdInput] = useState('');
-  const [cmdLog, setCmdLog] = useState([]);
-  const [sending, setSending] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [polling, setPolling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [regOpen, setRegOpen] = useState(false);
   const [deployOpen, setDeployOpen] = useState(false);
   const [deployCmd, setDeployCmd] = useState('');
@@ -44,7 +37,7 @@ export default function ClusterPage() {
       setNodes(p => p.filter(n => n.id !== nodeId));
       if (selectedNode?.id === nodeId) setSelectedNode(null);
       toast.success('Node deleted');
-    } catch { toast.error('Failed to delete node'); }
+    } catch { toast.error('Failed'); }
     finally { setDeleting(false); }
   };
 
@@ -56,7 +49,7 @@ export default function ClusterPage() {
       setSelectedNode(data.node);
       setEditOpen(false);
       toast.success('Node updated');
-    } catch { toast.error('Failed to update node'); }
+    } catch { toast.error('Failed'); }
     finally { setEditSaving(false); }
   };
 
@@ -68,7 +61,6 @@ export default function ClusterPage() {
       setSelectedNode(p => list.find(n => n.id === p?.id) || list[0] || null);
     }).catch(() => {});
     fetchGroups().then(d => setGroups(d.groups || [])).catch(() => {});
-    fetchWorkflows().then(d => setWorkflows(d.workflows || [])).catch(() => {});
     firstLoad.current = false;
     const iv = setInterval(() => {
       setPolling(true);
@@ -80,27 +72,6 @@ export default function ClusterPage() {
     }, 10000);
     return () => clearInterval(iv);
   }, []);
-
-  const handleSend = async (e) => {
-    e?.preventDefault();
-    const raw = cmdInput.trim();
-    if (!raw || !selectedNode) return;
-    const parts = raw.split(/\s+/);
-    const type = parts[0];
-    let payload = {};
-    try { if (parts.length > 1) payload = JSON.parse(parts.slice(1).join(' ')); }
-    catch { payload = { raw: parts.slice(1).join(' ') }; }
-    setSending(true);
-    try {
-      const data = await sendCommand(selectedNode.id, type, payload);
-      setCmdLog(p => [...p, { time: new Date().toLocaleTimeString(), text: `${type} → ${selectedNode.name}`, id: data.command?.id }]);
-      setCmdInput('');
-      toast.success(`Command ${type} sent to ${selectedNode.name}`);
-    } catch (err) {
-      toast.error(err.message);
-      setCmdLog(p => [...p, { time: new Date().toLocaleTimeString(), text: `ERR: ${err.message}`, error: true }]);
-    } finally { setSending(false); }
-  };
 
   const online = nodes.filter(n => n.online).length;
   const offline = nodes.filter(n => !n.online).length;
@@ -117,17 +88,14 @@ export default function ClusterPage() {
       </div>
 
       <div className="cluster-grid">
-        {/* Node list */}
         <div className="cluster-node-list">
           <h3 className="cluster-section-title">Node Registry</h3>
-          {nodes.length === 0 && (
-            <p className="cluster-detail-placeholder">No nodes registered. Click "Register Node" to add one.</p>
-          )}
+          {nodes.length === 0 && <p className="cluster-detail-placeholder">No nodes registered.</p>}
           {nodes.map(node => (
             <div key={node.id}
               className={'cluster-node-card' + (selectedNode?.id === node.id ? ' cluster-node-card--selected' : '')}
-              onClick={() => { setSelectedNode(node); setCmdLog([]); }}>
-              <span className="cluster-node-dot" style={{ background: (node.online ? STATUS_COLORS.online : STATUS_COLORS.offline) || '#8f99a8' }} />
+              onClick={() => setSelectedNode(node)}>
+              <span className="cluster-node-dot" style={{ background: node.online ? '#15b371' : '#cd4246' }} />
               <div className="cluster-node-info">
                 <span className="cluster-node-name">{node.name}</span>
                 <span className="cluster-node-group">{groupName(groups, node.groupId)} &middot; {node.task || 'idle'}</span>
@@ -140,25 +108,22 @@ export default function ClusterPage() {
           ))}
         </div>
 
-        {/* Detail + Console */}
         <div className="cluster-right">
           <Card className="cluster-detail-card">
             {selectedNode ? (
               <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 className="cluster-section-title" style={{ border: 'none', padding: 0, margin: 0 }}>{selectedNode.name}</h3>
-                </div>
+                <h3 className="cluster-section-title" style={{ border: 'none', padding: 0, margin: 0 }}>{selectedNode.name}</h3>
                 <div className="cluster-detail-grid" style={{ marginTop: 12 }}>
                   <DetailCol label="ID" value={selectedNode.id} />
                   <DetailCol label="Group" value={groupName(groups, selectedNode.groupId)} />
                   <DetailCol label="Status">
-                    <Tag intent={selectedNode.online ? Intent.SUCCESS : Intent.WARNING}>
-                      {(selectedNode.online ? 'ONLINE' : 'OFFLINE')}
+                    <Tag intent={selectedNode.online ? Intent.SUCCESS : Intent.DANGER}>
+                      {selectedNode.online ? 'ONLINE' : 'OFFLINE'}
                     </Tag>
                   </DetailCol>
                   <DetailCol label="Position" value={selectedNode.position ? `${selectedNode.position.x}, ${selectedNode.position.y}, ${selectedNode.position.z}` : '—'} />
                   <DetailCol label="Task" value={selectedNode.task || 'idle'} />
-                  <DetailCol label="Last Seen" value={selectedNode.lastSeen ? new Date(selectedNode.lastSeen).toLocaleTimeString() : 'never'} />
+                  <DetailCol label="Last Seen" value={selectedNode.lastSeen ? new Date(Number(selectedNode.lastSeen)).toLocaleTimeString() : 'never'} />
                 </div>
               </>
             ) : (
@@ -166,7 +131,6 @@ export default function ClusterPage() {
             )}
           </Card>
 
-          {/* Node Management */}
           {selectedNode && (
             <Card className="cluster-detail-card">
               <h3 className="cluster-section-title">Manage Node</h3>
@@ -184,95 +148,12 @@ export default function ClusterPage() {
                 }} />
                 <Button icon="trash" text="Delete Node" intent={Intent.DANGER} small loading={deleting} onClick={() => handleDelete(selectedNode.id)} />
               </div>
-              <div style={{ marginTop: 10 }}>
-                <h4 className="cluster-section-title" style={{ fontSize: 11, marginBottom: 6 }}>Workflows</h4>
-                {(() => {
-                  const gid = selectedNode.groupId;
-                  const groupName = groups.find(g => g.id === gid)?.name;
-                  const inherited = workflows.filter(w => gid && w.groupId === gid && w.nodeId !== selectedNode.id);
-                  const direct = workflows.filter(w => w.nodeId === selectedNode.id);
-                  const available = workflows.filter(w => (!w.groupId || w.groupId === gid) && w.nodeId !== selectedNode.id);
-
-                  return (
-                    <>
-                      {direct.length > 0 && (
-                        <div style={{ marginBottom: 6 }}>
-                          <span style={{ fontSize: 10, color: 'var(--bp-palette-gray-4)', textTransform: 'uppercase', letterSpacing: 1 }}>Direct</span>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
-                            {direct.map(w => (
-                              <span key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                <Button text={w.name} small minimal
-                                  onClick={() => triggerWorkflow(selectedNode.id, w.id).then(() => toast.success(`Triggered ${w.name}`))} />
-                                <Button icon="cross" small minimal
-                                  onClick={() => updateWorkflow(w.id, { nodeId: null }).then(() => {
-                                    setWorkflows(p => p.map(x => x.id === w.id ? { ...x, nodeId: null } : x));
-                                    toast.success('Unassigned');
-                                  })} />
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {inherited.length > 0 && (
-                        <div style={{ marginBottom: 6 }}>
-                          <span style={{ fontSize: 10, color: 'var(--bp-palette-gray-4)', textTransform: 'uppercase', letterSpacing: 1 }}>Inherited from {groupName}</span>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
-                            {inherited.map(w => (
-                              <Button key={w.id} text={w.name} small minimal
-                                onClick={() => triggerWorkflow(selectedNode.id, w.id).then(() => toast.success(`Triggered ${w.name}`))} />
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {direct.length === 0 && inherited.length === 0 && (
-                        <p style={{ fontSize: 12, color: 'var(--bp-palette-gray-3)', marginBottom: 6 }}>No workflows.</p>
-                      )}
-                      {available.length > 0 && (
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
-                          {available.slice(0, 8).map(w => (
-                            <Button key={w.id} text={w.name} small minimal
-                              onClick={() => updateWorkflow(w.id, { nodeId: selectedNode.id }).then(() => {
-                                setWorkflows(p => p.map(x => x.id === w.id ? { ...x, nodeId: selectedNode.id } : x));
-                                toast.success('Assigned');
-                              })}
-                              style={{ fontSize: 11 }} />
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </div>
             </Card>
           )}
-
-          <Card className="cluster-console-card">
-            <h3 className="cluster-section-title">Command Console</h3>
-            <div className="cluster-console-log">
-              {cmdLog.length === 0 && <p className="cluster-detail-placeholder">Select a node and send a command.</p>}
-              {cmdLog.map((entry, i) => (
-                <div key={i} className={'cluster-console-entry' + (entry.error ? ' cluster-console-entry--error' : '')}>
-                  <span className="cluster-console-time">[{entry.time}]</span> {entry.text}
-                  {entry.id && <span className="cluster-console-id"> [{entry.id}]</span>}
-                </div>
-              ))}
-            </div>
-            <form className="cluster-console-input-row" onSubmit={handleSend}>
-              <span className="cluster-console-prompt">&gt;</span>
-              <input className="cluster-console-input" value={cmdInput} onChange={e => setCmdInput(e.target.value)}
-                placeholder={selectedNode ? 'move {"x":0,"y":64,"z":0}' : 'Select a node first'} disabled={!selectedNode} />
-              <Button type="submit" text="Send" intent={Intent.PRIMARY} small loading={sending} disabled={!selectedNode || !cmdInput.trim()} />
-            </form>
-          </Card>
         </div>
       </div>
 
-      {/* Register Node Dialog */}
-      <RegisterDialog
-        isOpen={regOpen}
-        groups={groups}
-        apiBase={apiBase}
-        clientUrl={clientUrl}
+      <RegisterDialog isOpen={regOpen} groups={groups} apiBase={apiBase} clientUrl={clientUrl}
         onClose={() => setRegOpen(false)}
         onCreated={(node) => {
           setNodes(p => [...p, node]);
@@ -282,28 +163,16 @@ export default function ClusterPage() {
           setDeployToken(node.token);
           setDeployNodeName(node.name);
           setDeployOpen(true);
-        }}
-      />
+        }} />
 
-      {/* Deploy Guide Dialog */}
       <Dialog isOpen={deployOpen} onClose={() => setDeployOpen(false)} title={`Deploy Guide — ${deployNodeName}`} icon="send-to" style={{ width: 560 }}>
         <DialogBody>
           <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>One-Command Setup</h4>
-          <p style={{ fontSize: 13, color: 'var(--bp-palette-gray-3)', marginBottom: 8 }}>
-            Run this on your CC:Tweaked turtle to auto-install everything:
-          </p>
-          <pre style={{
-            background: 'var(--bp-palette-black)', color: 'var(--bp-palette-green-3)',
-            padding: 12, borderRadius: 4, fontSize: 13, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-          }}>{deployCmd}</pre>
-          <Button icon="clipboard" text="Copy" small style={{ marginTop: 8 }}
-            onClick={() => navigator.clipboard.writeText(deployCmd)} />
-
+          <p style={{ fontSize: 13, color: 'var(--bp-palette-gray-3)', marginBottom: 8 }}>Run this on your CC:Tweaked turtle:</p>
+          <pre style={{ background: 'var(--bp-palette-black)', color: 'var(--bp-palette-green-3)', padding: 12, borderRadius: 4, fontSize: 13, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{deployCmd}</pre>
+          <Button icon="clipboard" text="Copy" small style={{ marginTop: 8 }} onClick={() => navigator.clipboard.writeText(deployCmd)} />
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--bp-palette-gray-4)' }}>
             <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Manual Setup</h4>
-            <p style={{ fontSize: 13, color: 'var(--bp-palette-gray-3)', marginBottom: 8 }}>
-              Or download and place the files manually:
-            </p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <Button icon="download" text="config.lua" small onClick={() => {
@@ -320,15 +189,12 @@ export default function ClusterPage() {
                 <p style={{ fontSize: 11, color: 'var(--bp-palette-gray-4)', marginTop: 4 }}>Save to <code>/facility/client.lua</code></p>
               </div>
             </div>
-            <p style={{ fontSize: 12, color: 'var(--bp-palette-gray-3)', marginTop: 12 }}>
-              Then run: <code>shell.run("/facility/client.lua")</code>
-            </p>
+            <p style={{ fontSize: 12, color: 'var(--bp-palette-gray-3)', marginTop: 12 }}>Then run: <code>shell.run("/facility/client.lua")</code></p>
           </div>
         </DialogBody>
         <DialogFooter actions={<Button text="Done" intent={Intent.PRIMARY} onClick={() => setDeployOpen(false)} />} />
       </Dialog>
 
-      {/* Edit Node Dialog */}
       <Dialog isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Node" icon="edit">
         <DialogBody>
           <FormGroup label="Name" labelFor="edit-name">
@@ -350,40 +216,23 @@ export default function ClusterPage() {
 }
 
 function DetailCol({ label, value, children }) {
-  return (
-    <div className="cluster-detail-col">
-      <span className="cluster-detail-label">{label}</span>
-      {children || <span>{value}</span>}
-    </div>
-  );
+  return <div className="cluster-detail-col"><span className="cluster-detail-label">{label}</span>{children || <span>{value}</span>}</div>;
 }
-
-// ---- Register Dialog ----
 
 function RegisterDialog({ isOpen, groups, apiBase, clientUrl, onClose, onCreated }) {
   const [name, setName] = useState('');
   const [groupId, setGroupId] = useState('');
   const [loading, setLoading] = useState(false);
-
   const reset = () => { setName(''); setGroupId(''); };
 
   const handleCreate = async () => {
     if (!name.trim()) return;
     setLoading(true);
     try {
-      const data = await registerNode({
-        name,
-        groupId: groupId || null,
-        base: apiBase,
-        clientUrl: clientUrl,
-        configPath: '/etc/facility/config.lua',
-        clientPath: '/facility/client.lua',
-        startupPath: '/startup.lua',
-      });
+      const data = await registerNode({ name, groupId: groupId || null, base: apiBase, clientUrl, configPath: '/etc/facility/config.lua', clientPath: '/facility/client.lua', startupPath: '/startup.lua' });
       onCreated(data.node);
       reset();
-    } catch {}
-    finally { setLoading(false); }
+    } catch {} finally { setLoading(false); }
   };
 
   return (
@@ -405,4 +254,3 @@ function RegisterDialog({ isOpen, groups, apiBase, clientUrl, onClose, onCreated
     </Dialog>
   );
 }
-

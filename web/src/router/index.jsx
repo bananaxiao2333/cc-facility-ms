@@ -7,6 +7,7 @@ import ClusterPage from '../pages/ClusterPage';
 import GroupsPage from '../pages/GroupsPage';
 import ActionsPage from '../pages/ActionsPage';
 import WorkflowsPage from '../pages/WorkflowsPage';
+import OpsPage from '../pages/OpsPage';
 import NotFoundPage from '../pages/NotFoundPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -29,6 +30,7 @@ const router = createBrowserRouter([
       { path: 'groups', element: <GroupsPage /> },
       { path: 'actions', element: <ActionsPage /> },
       { path: 'workflows', element: <WorkflowsPage /> },
+      { path: 'ops', element: <OpsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
