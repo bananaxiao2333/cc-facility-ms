@@ -51,13 +51,51 @@ export default function ActionsPage() {
   };
 
   const handleDelete = async (id) => {
-    await deleteAction(id); load(); toast.success('Action deleted');
+    await deleteAction(id); load(); setSelected(null); toast.success('Action deleted');
+  };
+
+  const exportItem = (a) => {
+    const blob = new Blob([JSON.stringify(a, null, 2)], { type: 'application/json' });
+    const u = URL.createObjectURL(blob);
+    const el = document.createElement('a'); el.href = u; el.download = `${a.name}.json`; el.click();
+    URL.revokeObjectURL(u);
+  };
+  const exportAll = () => {
+    const blob = new Blob([JSON.stringify(actions, null, 2)], { type: 'application/json' });
+    const u = URL.createObjectURL(blob);
+    const el = document.createElement('a'); el.href = u; el.download = 'actions-export.json'; el.click();
+    URL.revokeObjectURL(u);
+  };
+  const importFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        const items = Array.isArray(data) ? data : [data];
+        for (const item of items) {
+          if (item.name) {
+            await createAction({
+              name: item.name, description: item.description || '',
+              type: item.type || 'exec', params: item.params || [], code: item.code || '',
+            });
+          }
+        }
+        load(); toast.success(`Imported ${items.length} action(s)`);
+      } catch { toast.error('Invalid JSON file'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   return (
     <div className="cluster-page">
       <div className="cluster-status-bar">
         <span className="cluster-stat">Actions: <strong>{actions.length}</strong></span>
+        <input type="file" accept=".json" onChange={importFile} style={{ display: 'none' }} id="actions-import" />
+        <Button icon="import" text="Import" small minimal onClick={() => document.getElementById('actions-import').click()} />
+        <Button icon="export" text="Export All" small minimal onClick={exportAll} />
         <Button icon="plus" text="New Action" intent={Intent.PRIMARY} small style={{ marginLeft: 'auto' }} onClick={openCreate} />
       </div>
 
@@ -85,6 +123,7 @@ export default function ActionsPage() {
                   <h3 className="cluster-section-title" style={{ border: 'none', padding: 0, margin: 0 }}>{selected.name}</h3>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <Button icon="edit" text="Edit" small onClick={() => openEdit(selected)} />
+                    <Button icon="export" text="Export" small onClick={() => exportItem(selected)} />
                     <Button icon="trash" text="Delete" intent={Intent.DANGER} small onClick={() => { handleDelete(selected.id); setSelected(null); }} />
                   </div>
                 </div>

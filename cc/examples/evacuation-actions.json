@@ -1,0 +1,62 @@
+[
+  {
+    "name": "evac_countdown",
+    "description": "Display a live countdown timer on screen with remaining time",
+    "type": "exec",
+    "params": [
+      {
+        "key": "seconds",
+        "label": "Seconds",
+        "type": "number",
+        "required": true,
+        "default": 90
+      }
+    ],
+    "code": "local remaining = tonumber(${seconds}) or 90\nwhile remaining > 0 do\n  term.clear() term.setCursorPos(1,1)\n  local m = math.floor(remaining / 60)\n  local s = remaining % 60\n  print(\"EVACUATION COUNTDOWN\")\n  print(string.format(\"%02d:%02d REMAINING\", m, s))\n  for i = 1, remaining do io.write(\"#\") end\n  print()\n  sleep(1)\n  remaining = remaining - 1\nend\nterm.clear() term.setCursorPos(1,1)\nprint(\"COUNTDOWN COMPLETE\")\nreturn { done = true, elapsed = 90 }"
+  },
+  {
+    "name": "evac_redstone_pulse",
+    "description": "Emit a redstone pulse on a given side for a duration",
+    "type": "exec",
+    "params": [
+      {
+        "key": "side",
+        "label": "Side",
+        "type": "select",
+        "required": true,
+        "default": "left",
+        "options": ["left", "right", "front", "back", "top", "bottom"]
+      },
+      {
+        "key": "duration",
+        "label": "Duration (ms)",
+        "type": "number",
+        "required": false,
+        "default": 1000
+      }
+    ],
+    "code": "local side = \"${side}\" or \"left\"\nlocal dur = tonumber(${duration}) or 1000\nredstone.setOutput(side, true)\nsleep(dur / 1000)\nredstone.setOutput(side, false)\nreturn { ok = true, side = side }"
+  },
+  {
+    "name": "evac_broadcast",
+    "description": "Print a message to the terminal",
+    "type": "exec",
+    "params": [
+      {
+        "key": "message",
+        "label": "Message",
+        "type": "string",
+        "required": true,
+        "default": "EVACUATE NOW"
+      }
+    ],
+    "code": "local msg = \"${message}\"\nprint(msg)\nreturn { ok = true, message = msg }"
+  },
+  {
+    "name": "peripheral_scan",
+    "description": "Scan all connected peripherals and return their types and methods",
+    "type": "exec",
+    "params": [],
+    "code": "local names = { peripheral.getNames() }\nlocal devices = {}\nfor _, name in ipairs(names) do\n  local ok, dev = pcall(peripheral.wrap, name)\n  if ok and dev then\n    table.insert(devices, { name = name, type = peripheral.getType(name) or \"unknown\" })\n  end\nend\nreturn { peripherals = devices, count = #devices }"
+  }
+]

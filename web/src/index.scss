@@ -514,10 +514,265 @@ body {
   width: 100%;
 }
 
-.dashboard-stats {
+.dash-stat-row {
   display: flex;
   gap: 16px;
+  margin-bottom: 24px;
   flex-wrap: wrap;
+}
+
+.dash-stat-box {
+  flex: 1;
+  min-width: 130px;
+  border-radius: 6px;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.dash-stat-box--flat {
+  background: none;
+  box-shadow: none;
+  padding: 12px 16px;
+}
+
+.bp6-dark .dash-stat-box {
+  background: $dark-gray3;
+}
+
+.bp6-dark .dash-stat-box--flat {
+  background: none;
+}
+
+.dash-stat-value {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.dash-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: $pt-text-color-muted;
+  margin-top: 4px;
+}
+
+.dash-stat-sub {
+  font-size: 11px;
+  color: $pt-text-color-disabled;
+  margin-top: 2px;
+}
+
+// Dashboard grid
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dash-card {
+  padding: 16px 20px !important;
+}
+
+.dash-card--wide {
+  grid-column: 1 / -1;
+}
+
+// Node list
+.dash-node-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-node-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid $light-gray5;
+}
+
+.bp6-dark .dash-node-row {
+  border-color: $dark-gray3;
+}
+
+.dash-node-name {
+  font-weight: 600;
+  min-width: 80px;
+}
+
+.dash-node-group {
+  color: $pt-text-color-muted;
+  font-size: 11px;
+  flex: 1;
+}
+
+.dash-node-battery {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dash-node-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  color: #fff;
+  background: #15b371;
+}
+
+.dash-node-row .dash-node-status {
+  background: var(--bg, #15b371);
+}
+
+// Run list
+.dash-run-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dash-run-row {
+  padding: 8px 0;
+  border-bottom: 1px solid $light-gray5;
+}
+
+.bp6-dark .dash-run-row {
+  border-color: $dark-gray3;
+}
+
+.dash-run-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.dash-run-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: $pt-text-color-muted;
+  margin-top: 2px;
+}
+
+.dash-run-status {
+  font-weight: 600;
+}
+
+.dash-run-progress {
+  height: 4px;
+  background: $light-gray4;
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.bp6-dark .dash-run-progress {
+  background: $dark-gray3;
+}
+
+.dash-run-bar {
+  height: 100%;
+  background: #2d72d2;
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.dash-run-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: $pt-text-color-disabled;
+  margin-top: 3px;
+}
+
+// Group chips
+.dash-group-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dash-group-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: $light-gray5;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.bp6-dark .dash-group-chip {
+  background: $dark-gray3;
+}
+
+// Action list
+.dash-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-action-row {
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 13px;
+  border-bottom: 1px solid $light-gray5;
+}
+
+.bp6-dark .dash-action-row {
+  border-color: $dark-gray3;
+}
+
+// Skeleton loading
+.dash-skl {
+  height: 14px;
+  background: $light-gray4;
+  border-radius: 3px;
+  animation: dash-skl-pulse 1.5s ease-in-out infinite;
+}
+
+.bp6-dark .dash-skl {
+  background: $dark-gray4;
+}
+
+@keyframes dash-skl-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+// Event feed
+.dash-event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.dash-event-row {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  font-family: monospace;
+  padding: 3px 0;
+  border-bottom: 1px solid $light-gray5;
+}
+
+.bp6-dark .dash-event-row {
+  border-color: $dark-gray3;
+}
+
+.dash-event-time {
+  color: $pt-text-color-muted;
+  flex-shrink: 0;
 }
 
 // ---- Groups ----
@@ -586,12 +841,12 @@ body {
 // Alarm banner — scrolling marquee
 .cluster-alarm-banner {
   background: $dark-gray2;
-  border: 1px solid $red3;
-  border-left: 4px solid $red3;
+  border-left: 4px solid;
   padding: 10px 0;
   margin-bottom: 16px;
   overflow: hidden;
   white-space: nowrap;
+  transition: border-color 0.5s ease;
 }
 
 .bp6-dark .cluster-alarm-banner {
@@ -605,11 +860,11 @@ body {
 }
 
 .cluster-alarm-item {
-  color: $red4;
   font-family: monospace;
   font-size: 13px;
   letter-spacing: 1px;
   white-space: nowrap;
+  transition: color 0.5s ease;
 }
 
 @keyframes cluster-alarm-marquee {

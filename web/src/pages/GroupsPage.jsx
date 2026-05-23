@@ -252,7 +252,7 @@ export default function GroupsPage() {
                                 marginLeft: "auto",
                               }}
                             >
-                              {n.battery}%
+{n.online ? 'ON' : 'OFF'}
                             </span>
                             <span
                               style={{

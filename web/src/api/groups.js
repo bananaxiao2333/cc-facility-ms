@@ -1,8 +1,7 @@
-import { get, post, patch, del } from './client';
+import { get, getSilent, post, patch, del } from './client';
 
-export function fetchGroups() {
-  return get('/api/groups');
-}
+export function fetchGroups() { return get('/api/groups'); }
+export function fetchGroupsSilent() { return getSilent('/api/groups'); }
 
 export function createGroup(body) {
   return post('/api/groups', body);

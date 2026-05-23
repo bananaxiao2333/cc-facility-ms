@@ -70,6 +70,41 @@ export default function WorkflowsPage() {
 
   const handleDelete = async (id) => { await deleteWorkflow(id); load(); setSelected(null); toast.success('Deleted'); };
 
+  const exportItem = (w) => {
+    const blob = new Blob([JSON.stringify(w, null, 2)], { type: 'application/json' });
+    const u = URL.createObjectURL(blob);
+    const el = document.createElement('a'); el.href = u; el.download = `${w.name}.json`; el.click();
+    URL.revokeObjectURL(u);
+  };
+  const exportAll = () => {
+    const blob = new Blob([JSON.stringify(workflows, null, 2)], { type: 'application/json' });
+    const u = URL.createObjectURL(blob);
+    const el = document.createElement('a'); el.href = u; el.download = 'workflows-export.json'; el.click();
+    URL.revokeObjectURL(u);
+  };
+  const importFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        const items = Array.isArray(data) ? data : [data];
+        for (const item of items) {
+          if (item.name) {
+            await createWorkflow({
+              name: item.name, enabled: item.enabled !== false,
+              steps: item.steps || [], groupId: item.groupId || null, nodeId: item.nodeId || null,
+            });
+          }
+        }
+        load(); toast.success(`Imported ${items.length} workflow(s)`);
+      } catch { toast.error('Invalid JSON file'); }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const stepLabels = (w) => {
     const st = w.steps || [];
     if (!st.length) return '0 steps';
@@ -85,6 +120,9 @@ export default function WorkflowsPage() {
     <div className="cluster-page">
       <div className="cluster-status-bar">
         <span className="cluster-stat">Workflows: <strong>{workflows.length}</strong></span>
+        <input type="file" accept=".json" onChange={importFile} style={{ display: 'none' }} id="workflows-import" />
+        <Button icon="import" text="Import" small minimal onClick={() => document.getElementById('workflows-import').click()} />
+        <Button icon="export" text="Export All" small minimal onClick={exportAll} />
         <Button icon="plus" text="New Workflow" intent={Intent.PRIMARY} small style={{ marginLeft: 'auto' }} onClick={openCreate} />
       </div>
 
@@ -110,6 +148,7 @@ export default function WorkflowsPage() {
                   <h3 className="cluster-section-title" style={{ border: 'none', padding: 0, margin: 0 }}>{selected.name}</h3>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <Button icon="edit" text="Edit" small onClick={() => openEdit(selected)} />
+                    <Button icon="export" text="Export" small onClick={() => exportItem(selected)} />
                     <Button icon="trash" text="Delete" intent={Intent.DANGER} small onClick={() => handleDelete(selected.id)} />
                   </div>
                 </div>

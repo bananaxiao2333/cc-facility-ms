@@ -89,7 +89,19 @@ local function execCommand(cmd)
   local t = cmd.type
   local p = cmd.payload or {}
 
-  if t == "ping" then
+  if t == "scan" then
+    local names = { peripheral.getNames() }
+    local devices = {}
+    for _, name in ipairs(names) do
+      local ok, dev = pcall(peripheral.wrap, name)
+      if ok and dev then
+        local methods = {}
+        for k, v in pairs(dev) do if type(v) == "function" then table.insert(methods, k) end end
+        table.insert(devices, { name = name, type = peripheral.getType(name), methods = methods })
+      end
+    end
+    return true, { peripherals = devices }
+  elseif t == "ping" then
     return true, { pong = true, node = config.node_id }
   elseif t == "sleep" then
     local ms = p.ms or 1000

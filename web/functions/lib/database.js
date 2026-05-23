@@ -188,6 +188,7 @@ const KEY_CLUSTER_COMMANDS = "data_cluster_commands";
 const KEY_CLUSTER_EVENTS = "data_cluster_events";
 const KEY_ACTIONS = "data_actions";
 const KEY_WORKFLOWS = "data_workflows";
+const KEY_WF_STATE = "data_wf_state";
 
 const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -1786,4 +1787,198 @@ export async function deleteWorkflow(id) {
   delete all[id];
   await saveCollection(KEY_WORKFLOWS, all);
   return true;
+}
+
+// ---- workflow execution ----
+
+function wfStateKey(nodeId, wfId) { return nodeId + "_" + wfId; }
+
+async function getWfState() {
+  return await loadCollection(KEY_WF_STATE);
+}
+
+async function saveWfState(state) {
+  await saveCollection(KEY_WF_STATE, state);
+}
+
+// Store command result into workflow run state for condition evaluation
+export async function storeWorkflowResult(commandId, nodeId, result) {
+  // commandId format: "wf_wfId_timestamp"
+  const parts = commandId.split("_");
+  if (parts.length < 3) return;
+  // Find the workflow run for this node that's currently running
+  const state = await getWfState();
+  for (const [key, run] of Object.entries(state)) {
+    if (run && run.nodeId === nodeId && run.status === "running" && commandId.includes(run.workflowId)) {
+      run.lastResult = result;
+      state[key] = run;
+      await saveWfState(state);
+      return;
+    }
+  }
+}
+
+// Evaluate a simple condition expression against a result object
+function evalCondition(expression, result) {
+  if (!expression || !expression.trim()) return false;
+  const expr = expression.trim();
+  // Support: result.key > value, result.key == value, result.key
+  const m = expr.match(/^result\.(\w+)\s*(>|<|>=|<=|==|!=)\s*(.+)$/);
+  if (m) {
+    const [, key, op, val] = m;
+    const rv = result?.[key];
+    const cv = isNaN(val) ? val.replace(/^["']|["']$/g, '') : Number(val);
+    if (rv === undefined) return false;
+    switch (op) {
+      case '>': return Number(rv) > Number(cv);
+      case '<': return Number(rv) < Number(cv);
+      case '>=': return Number(rv) >= Number(cv);
+      case '<=': return Number(rv) <= Number(cv);
+      case '==': return String(rv) === String(cv);
+      case '!=': return String(rv) !== String(cv);
+    }
+  }
+  // Truthiness check: result.key
+  const tm = expr.match(/^result\.(\w+)$/);
+  if (tm) return !!result?.[tm[1]];
+  // Literal check: result.key == "string"
+  const lt = expr.match(/^result\.(\w+)\s*==\s*["'](.+?)["']$/);
+  if (lt) return String(result?.[lt[1]]) === lt[2];
+  return false;
+}
+
+// Start or reset a workflow run for a node
+export async function startWorkflowRun(nodeId, wfId) {
+  const state = await getWfState();
+  const key = wfStateKey(nodeId, wfId);
+  state[key] = { nodeId, workflowId: wfId, currentStep: 0, status: "running", waitUntil: 0, lastRun: now(), startedAt: now(), lastResult: null, nextRun: 0 };
+  await saveWfState(state);
+  return state[key];
+}
+
+// Get the next pending action for a node from its assigned workflows
+// Get all active workflow runs across all nodes
+export async function getActiveRuns() {
+  const state = await getWfState();
+  const wfs = await loadWorkflows();
+  const nodes = await loadNodes();
+  const runs = [];
+  for (const [key, run] of Object.entries(state)) {
+    if (!run || run.status === 'done') continue;
+    const wf = wfs.find(w => w.id === run.workflowId);
+    const node = nodes.find(n => n.id === run.nodeId);
+    if (!wf) continue;
+    const steps = wf.steps || [];
+    runs.push({
+      key,
+      workflowId: run.workflowId,
+      workflowName: wf.name,
+      nodeId: run.nodeId,
+      nodeName: node?.name || run.nodeId,
+      currentStep: run.currentStep,
+      totalSteps: steps.length,
+      status: run.status,
+      startedAt: run.startedAt,
+      lastRun: run.lastRun,
+      triggerType: steps[0]?.type === 'trigger' ? steps[0].triggerType : 'manual',
+    });
+  }
+  return runs.sort((a, b) => b.startedAt - a.startedAt);
+}
+
+export async function getNextWorkflowAction(nodeId, nodeGroupId) {
+  const wfs = await loadWorkflows();
+  const state = await getWfState();
+  const nowTs = now();
+
+  // Find relevant workflows: directly assigned + group-inherited
+  const relevant = wfs.filter(w => w.enabled && (
+    w.nodeId === nodeId || (w.groupId && w.groupId === nodeGroupId && !w.nodeId)
+  ));
+
+  for (const wf of relevant) {
+    const steps = wf.steps || [];
+    if (!steps.length) continue;
+    const key = wfStateKey(nodeId, wf.id);
+    let run = state[key];
+    const trigger = steps[0]?.type === 'trigger' ? steps[0] : null;
+
+    // Interval triggers: auto-start or auto-restart
+    if (trigger?.triggerType === 'interval') {
+      if (!run) {
+        run = await startWorkflowRun(nodeId, wf.id);
+      } else if (run.status === 'done' && run.nextRun && nowTs >= run.nextRun) {
+        run.status = 'running';
+        run.currentStep = 1; // skip trigger step
+        run.lastRun = nowTs;
+        run.nextRun = 0;
+        state[key] = run;
+        await saveWfState(state);
+      }
+    }
+    // Startup triggers: start on first poll
+    if (!run && trigger?.triggerType === 'startup') {
+      run = await startWorkflowRun(nodeId, wf.id);
+    }
+    if (!run || (run.status === 'done' && trigger?.triggerType !== 'interval')) continue;
+
+    let idx = run.currentStep;
+    // Skip past non-action steps that can be resolved server-side
+    while (idx < steps.length) {
+      const step = steps[idx];
+      if (step.type === 'trigger') { idx++; continue; }
+      if (step.type === 'delay') {
+        if (run.waitUntil && nowTs < run.waitUntil) return null; // still waiting
+        idx++; run.currentStep = idx; run.waitUntil = 0;
+        await saveWfState(Object.assign(state, { [key]: run }));
+        continue;
+      }
+      if (step.type === 'condition') {
+        const result = run.lastResult;
+        const shouldJump = evalCondition(step.expression, result);
+        if (shouldJump && step.jumpTo) {
+          const targetIdx = parseInt(step.jumpTo) - 1; // step.jumpTo is 1-indexed
+          if (targetIdx >= 0 && targetIdx < steps.length) {
+            idx = targetIdx;
+            run.currentStep = idx;
+            run.lastResult = null;
+            await saveWfState(Object.assign(state, { [key]: run }));
+            continue;
+          }
+        }
+        // Condition false → fall through to next step
+        idx++;
+        run.currentStep = idx;
+        run.lastResult = null;
+        await saveWfState(Object.assign(state, { [key]: run }));
+        continue;
+      }
+      if (step.type === 'action' && step.actionId) {
+        // Found an action to dispatch
+        const action = await getAction(step.actionId);
+        if (!action) { idx++; continue; }
+        // Advance to next step
+        run.currentStep = idx + 1;
+        if (run.currentStep >= steps.length) run.status = 'done';
+        if (run.status === 'done' && trigger?.triggerType === 'interval') run.lastRun = nowTs;
+        await saveWfState(Object.assign(state, { [key]: run }));
+        return {
+          workflowId: wf.id,
+          workflowName: wf.name,
+          stepIndex: idx,
+          action,
+          params: step.params || {},
+        };
+      }
+      idx++;
+    }
+    // Reached end
+    run.status = 'done';
+    if (trigger?.triggerType === 'interval') {
+      const intervalMs = trigger.intervalMs || 60000;
+      run.nextRun = nowTs + intervalMs;
+    }
+    await saveWfState(Object.assign(state, { [key]: run }));
+  }
+  return null;
 }

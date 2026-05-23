@@ -20,6 +20,18 @@ export function updateNode(nodeId, body) {
   return patch(`/api/cluster/nodes/${encodeURIComponent(nodeId)}`, body);
 }
 
+export function triggerWorkflow(nodeId, workflowId) {
+  return post(`/api/cluster/poll?node=${encodeURIComponent(nodeId)}`, { workflowId });
+}
+
+export function fetchActiveRuns() {
+  return get('/api/cluster/runs');
+}
+
+export function fetchActiveRunsSilent() {
+  return getSilent('/api/cluster/runs');
+}
+
 export function sendCommand(nodeId, type, payload, priority) {
   return post('/api/cluster/commands', { nodeId, type, payload, priority });
 }

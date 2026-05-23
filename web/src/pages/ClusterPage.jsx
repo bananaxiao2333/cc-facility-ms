@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Intent, Tag, Dialog, DialogBody, DialogFooter, FormGroup, InputGroup, HTMLSelect } from '@blueprintjs/core';
-import { fetchNodes, fetchNodesSilent, sendCommand, registerNode, deleteNode, updateNode } from '../api/cluster';
+import { fetchNodes, fetchNodesSilent, sendCommand, registerNode, deleteNode, updateNode, triggerWorkflow } from '../api/cluster';
 import { fetchGroups } from '../api/groups';
 import { fetchWorkflows, updateWorkflow } from '../api/workflows';
 import { useToast } from '../context/ToastContext';
@@ -134,7 +134,7 @@ export default function ClusterPage() {
               </div>
               <div className="cluster-node-meta">
                 {node.position && <span className="cluster-node-coords">{node.position.x}, {node.position.y}, {node.position.z}</span>}
-                <span className="cluster-node-battery">{node.battery}%</span>
+                <span className="cluster-node-battery">{node.online ? 'ON' : 'OFF'}</span>
               </div>
             </div>
           ))}
@@ -156,7 +156,6 @@ export default function ClusterPage() {
                       {(selectedNode.online ? 'ONLINE' : 'OFFLINE')}
                     </Tag>
                   </DetailCol>
-                  <DetailCol label="Battery" value={`${selectedNode.battery}%`} />
                   <DetailCol label="Position" value={selectedNode.position ? `${selectedNode.position.x}, ${selectedNode.position.y}, ${selectedNode.position.z}` : '—'} />
                   <DetailCol label="Task" value={selectedNode.task || 'idle'} />
                   <DetailCol label="Last Seen" value={selectedNode.lastSeen ? new Date(selectedNode.lastSeen).toLocaleTimeString() : 'never'} />
@@ -201,11 +200,15 @@ export default function ClusterPage() {
                           <span style={{ fontSize: 10, color: 'var(--bp-palette-gray-4)', textTransform: 'uppercase', letterSpacing: 1 }}>Direct</span>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
                             {direct.map(w => (
-                              <Button key={w.id} text={w.name} small minimal rightIcon="cross"
-                                onClick={() => updateWorkflow(w.id, { nodeId: null }).then(() => {
-                                  setWorkflows(p => p.map(x => x.id === w.id ? { ...x, nodeId: null } : x));
-                                  toast.success('Unassigned');
-                                })} />
+                              <span key={w.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Button text={w.name} small minimal
+                                  onClick={() => triggerWorkflow(selectedNode.id, w.id).then(() => toast.success(`Triggered ${w.name}`))} />
+                                <Button icon="cross" small minimal
+                                  onClick={() => updateWorkflow(w.id, { nodeId: null }).then(() => {
+                                    setWorkflows(p => p.map(x => x.id === w.id ? { ...x, nodeId: null } : x));
+                                    toast.success('Unassigned');
+                                  })} />
+                              </span>
                             ))}
                           </div>
                         </div>
@@ -215,7 +218,8 @@ export default function ClusterPage() {
                           <span style={{ fontSize: 10, color: 'var(--bp-palette-gray-4)', textTransform: 'uppercase', letterSpacing: 1 }}>Inherited from {groupName}</span>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
                             {inherited.map(w => (
-                              <span key={w.id} style={{ fontSize: 12, color: 'var(--bp-palette-gray-3)', padding: '2px 6px', borderRadius: 3, background: 'var(--bp-palette-light-gray-4)' }}>{w.name}</span>
+                              <Button key={w.id} text={w.name} small minimal
+                                onClick={() => triggerWorkflow(selectedNode.id, w.id).then(() => toast.success(`Triggered ${w.name}`))} />
                             ))}
                           </div>
                         </div>

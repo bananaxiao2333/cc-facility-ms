@@ -1,0 +1,72 @@
+[
+  {
+    "name": "Evacuation Protocol",
+    "enabled": true,
+    "steps": [
+      {
+        "id": "s1",
+        "type": "trigger",
+        "triggerType": "manual",
+        "intervalMs": 60000,
+        "delayMs": 1000,
+        "actionId": "",
+        "params": {},
+        "expression": "",
+        "jumpTo": ""
+      },
+      {
+        "id": "s2",
+        "type": "action",
+        "triggerType": "manual",
+        "intervalMs": 60000,
+        "delayMs": 1000,
+        "actionId": "",
+        "params": {
+          "message": "WARNING: Evacuation sequence initiated. All personnel evacuate immediately."
+        },
+        "expression": "",
+        "jumpTo": ""
+      },
+      {
+        "id": "s3",
+        "type": "action",
+        "triggerType": "manual",
+        "intervalMs": 60000,
+        "delayMs": 1000,
+        "actionId": "",
+        "params": {
+          "seconds": "90"
+        },
+        "expression": "",
+        "jumpTo": ""
+      },
+      {
+        "id": "s4",
+        "type": "action",
+        "triggerType": "manual",
+        "intervalMs": 60000,
+        "delayMs": 1000,
+        "actionId": "",
+        "params": {
+          "side": "left",
+          "duration": "3000"
+        },
+        "expression": "",
+        "jumpTo": ""
+      },
+      {
+        "id": "s5",
+        "type": "action",
+        "triggerType": "manual",
+        "intervalMs": 60000,
+        "delayMs": 1000,
+        "actionId": "",
+        "params": {
+          "message": "COUNTDOWN COMPLETE. Redstone signal emitted."
+        },
+        "expression": "",
+        "jumpTo": ""
+      }
+    ]
+  }
+]
