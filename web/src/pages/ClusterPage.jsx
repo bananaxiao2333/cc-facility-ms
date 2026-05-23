@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, Button, Intent, Tag, Dialog, DialogBody, DialogFooter, FormGroup, InputGroup, HTMLSelect } from '@blueprintjs/core';
 import { fetchNodes, fetchNodesSilent, sendCommand, registerNode, deleteNode, updateNode } from '../api/cluster';
 import { fetchGroups } from '../api/groups';
+import { fetchWorkflows, updateWorkflow } from '../api/workflows';
 import { useToast } from '../context/ToastContext';
 import clientUrl from '@cc/ccfms-client.lua?url';
 
@@ -16,6 +17,7 @@ function groupName(groups, groupId) {
 export default function ClusterPage() {
   const [nodes, setNodes] = useState([]);
   const [groups, setGroups] = useState([]);
+  const [workflows, setWorkflows] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   const [cmdInput, setCmdInput] = useState('');
   const [cmdLog, setCmdLog] = useState([]);
@@ -66,6 +68,7 @@ export default function ClusterPage() {
       setSelectedNode(p => list.find(n => n.id === p?.id) || list[0] || null);
     }).catch(() => {});
     fetchGroups().then(d => setGroups(d.groups || [])).catch(() => {});
+    fetchWorkflows().then(d => setWorkflows(d.workflows || [])).catch(() => {});
     firstLoad.current = false;
     const iv = setInterval(() => {
       setPolling(true);
@@ -181,6 +184,60 @@ export default function ClusterPage() {
                   setEditOpen(true);
                 }} />
                 <Button icon="trash" text="Delete Node" intent={Intent.DANGER} small loading={deleting} onClick={() => handleDelete(selectedNode.id)} />
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <h4 className="cluster-section-title" style={{ fontSize: 11, marginBottom: 6 }}>Workflows</h4>
+                {(() => {
+                  const gid = selectedNode.groupId;
+                  const groupName = groups.find(g => g.id === gid)?.name;
+                  const inherited = workflows.filter(w => gid && w.groupId === gid && w.nodeId !== selectedNode.id);
+                  const direct = workflows.filter(w => w.nodeId === selectedNode.id);
+                  const available = workflows.filter(w => (!w.groupId || w.groupId === gid) && w.nodeId !== selectedNode.id);
+
+                  return (
+                    <>
+                      {direct.length > 0 && (
+                        <div style={{ marginBottom: 6 }}>
+                          <span style={{ fontSize: 10, color: 'var(--bp-palette-gray-4)', textTransform: 'uppercase', letterSpacing: 1 }}>Direct</span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                            {direct.map(w => (
+                              <Button key={w.id} text={w.name} small minimal rightIcon="cross"
+                                onClick={() => updateWorkflow(w.id, { nodeId: null }).then(() => {
+                                  setWorkflows(p => p.map(x => x.id === w.id ? { ...x, nodeId: null } : x));
+                                  toast.success('Unassigned');
+                                })} />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {inherited.length > 0 && (
+                        <div style={{ marginBottom: 6 }}>
+                          <span style={{ fontSize: 10, color: 'var(--bp-palette-gray-4)', textTransform: 'uppercase', letterSpacing: 1 }}>Inherited from {groupName}</span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+                            {inherited.map(w => (
+                              <span key={w.id} style={{ fontSize: 12, color: 'var(--bp-palette-gray-3)', padding: '2px 6px', borderRadius: 3, background: 'var(--bp-palette-light-gray-4)' }}>{w.name}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {direct.length === 0 && inherited.length === 0 && (
+                        <p style={{ fontSize: 12, color: 'var(--bp-palette-gray-3)', marginBottom: 6 }}>No workflows.</p>
+                      )}
+                      {available.length > 0 && (
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
+                          {available.slice(0, 8).map(w => (
+                            <Button key={w.id} text={w.name} small minimal
+                              onClick={() => updateWorkflow(w.id, { nodeId: selectedNode.id }).then(() => {
+                                setWorkflows(p => p.map(x => x.id === w.id ? { ...x, nodeId: selectedNode.id } : x));
+                                toast.success('Assigned');
+                              })}
+                              style={{ fontSize: 11 }} />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </Card>
           )}

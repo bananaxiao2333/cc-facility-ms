@@ -186,6 +186,8 @@ const KEY_GROUPS = "data_groups";
 const KEY_CLUSTER_NODES = "data_cluster_nodes";
 const KEY_CLUSTER_COMMANDS = "data_cluster_commands";
 const KEY_CLUSTER_EVENTS = "data_cluster_events";
+const KEY_ACTIONS = "data_actions";
+const KEY_WORKFLOWS = "data_workflows";
 
 const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -1689,4 +1691,99 @@ export async function runClusterHeartbeat() {
       await markNodeOffline(node.id);
     }
   }
+}
+
+// ---- actions ----
+
+export async function loadActions() {
+  const all = await loadCollection(KEY_ACTIONS);
+  return Object.values(all).filter(a => a && a.id);
+}
+
+export async function getAction(id) {
+  const all = await loadCollection(KEY_ACTIONS);
+  return all[id] || null;
+}
+
+export async function createAction({ name, description, type, params, code }) {
+  const all = await loadCollection(KEY_ACTIONS);
+  const id = makeId("act");
+  all[id] = {
+    id, name: String(name||"").trim().slice(0,64),
+    description: String(description||"").trim().slice(0,256),
+    type: String(type||"exec"),
+    params: Array.isArray(params) ? params : [],
+    code: String(code||""),
+    createdAt: now(), updatedAt: now(),
+  };
+  await saveCollection(KEY_ACTIONS, all);
+  return all[id];
+}
+
+export async function updateAction(id, patch) {
+  const all = await loadCollection(KEY_ACTIONS);
+  if (!all[id]) return null;
+  if (patch.name !== undefined) all[id].name = String(patch.name).trim().slice(0,64);
+  if (patch.description !== undefined) all[id].description = String(patch.description).trim().slice(0,256);
+  if (patch.type !== undefined) all[id].type = String(patch.type);
+  if (patch.params !== undefined) all[id].params = patch.params;
+  if (patch.code !== undefined) all[id].code = String(patch.code);
+  all[id].updatedAt = now();
+  await saveCollection(KEY_ACTIONS, all);
+  return all[id];
+}
+
+export async function deleteAction(id) {
+  const all = await loadCollection(KEY_ACTIONS);
+  if (!all[id]) return false;
+  delete all[id];
+  await saveCollection(KEY_ACTIONS, all);
+  return true;
+}
+
+// ---- workflows ----
+
+export async function loadWorkflows() {
+  const all = await loadCollection(KEY_WORKFLOWS);
+  return Object.values(all).filter(w => w && w.id);
+}
+
+export async function getWorkflow(id) {
+  const all = await loadCollection(KEY_WORKFLOWS);
+  return all[id] || null;
+}
+
+export async function createWorkflow({ name, groupId, nodeId, enabled, steps }) {
+  const all = await loadCollection(KEY_WORKFLOWS);
+  const id = makeId("wf");
+  all[id] = {
+    id, name: String(name||"").trim().slice(0,64),
+    groupId: groupId || null, nodeId: nodeId || null,
+    enabled: enabled !== false,
+    steps: Array.isArray(steps) ? steps : [],
+    createdAt: now(), updatedAt: now(),
+  };
+  await saveCollection(KEY_WORKFLOWS, all);
+  return all[id];
+}
+
+export async function updateWorkflow(id, patch) {
+  const all = await loadCollection(KEY_WORKFLOWS);
+  if (!all[id]) return null;
+  if (patch.name !== undefined) all[id].name = String(patch.name).trim().slice(0,64);
+  if (patch.groupId !== undefined) all[id].groupId = patch.groupId || null;
+  if (patch.nodeId !== undefined) all[id].nodeId = patch.nodeId || null;
+  if (patch.enabled !== undefined) all[id].enabled = !!patch.enabled;
+  if (patch.steps !== undefined) all[id].steps = patch.steps;
+  all[id].updatedAt = now();
+  await saveCollection(KEY_WORKFLOWS, all);
+  return all[id];
+}
+
+export async function deleteWorkflow(id) {
+  const all = await loadCollection(KEY_WORKFLOWS);
+  if (!all[id]) return false;
+  delete all[id];
+  await saveCollection(KEY_WORKFLOWS, all);
+  return true;
 }
