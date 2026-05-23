@@ -28,7 +28,7 @@ function fmtDate(ts) {
 }
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const group = getGroup(user.groupId);
 
@@ -50,7 +50,9 @@ export default function ProfilePage() {
     try {
       const data = await updateProfile({ displayName });
       setDisplayName(data.user.displayName || '');
-      setNameMsg('Updated');
+      await refreshUser();
+      setNameMsg('Saved');
+      setTimeout(() => setNameOpen(false), 800);
     } catch (e) {
       setNameMsg(e.message);
     } finally {
@@ -106,6 +108,11 @@ export default function ProfilePage() {
           </div>
           <span className="profile-params-sep" />
           <div className="profile-params-col">
+            <span className="profile-params-head">Display</span>
+            <span className="profile-params-val">{user.displayName || '—'}</span>
+          </div>
+          <span className="profile-params-sep" />
+          <div className="profile-params-col">
             <span className="profile-params-head">Role</span>
             <span className="profile-params-val">{user.role}</span>
           </div>
@@ -118,11 +125,6 @@ export default function ProfilePage() {
           <div className="profile-params-col">
             <span className="profile-params-head">Created</span>
             <span className="profile-params-val">{fmtDate(user.createdAt)}</span>
-          </div>
-          <span className="profile-params-sep" />
-          <div className="profile-params-col">
-            <span className="profile-params-head">Updated</span>
-            <span className="profile-params-val">{fmtDate(user.updatedAt)}</span>
           </div>
         </div>
       </div>

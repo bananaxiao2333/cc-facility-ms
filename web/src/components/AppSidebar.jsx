@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
   { to: '/', icon: 'dashboard', label: 'Dashboard' },
+  { to: '/cluster', icon: 'graph', label: 'Cluster' },
+  { to: '/groups', icon: 'people', label: 'Groups' },
   { to: '/profile', icon: 'user', label: 'Profile' },
 ];
 

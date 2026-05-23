@@ -499,7 +499,363 @@ body {
   align-items: flex-start;
 }
 
-// ---- Global Loading Overlay ----
+// ---- Dashboard ----
+.dashboard-page {
+  width: 100%;
+}
+
+.dashboard-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+// ---- Cluster Page ----
+.cluster-page {
+  width: 100%;
+}
+
+// Alarm banner — scrolling marquee
+.cluster-alarm-banner {
+  background: $dark-gray2;
+  border: 1px solid $red3;
+  border-left: 4px solid $red3;
+  padding: 10px 0;
+  margin-bottom: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.bp6-dark .cluster-alarm-banner {
+  background: $dark-gray1;
+}
+
+.cluster-alarm-scroll {
+  display: inline-flex;
+  gap: 48px;
+  animation: cluster-alarm-marquee 60s linear infinite;
+}
+
+.cluster-alarm-item {
+  color: $red4;
+  font-family: monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+@keyframes cluster-alarm-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+// Status bar
+.cluster-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.cluster-stat {
+  color: $pt-text-color-muted;
+  strong { color: $pt-text-color; }
+}
+
+.bp6-dark .cluster-stat {
+  color: $pt-dark-text-color-muted;
+  strong { color: $pt-dark-text-color; }
+}
+
+.cluster-stat--online strong { color: $green3; }
+.cluster-stat--offline strong { color: $red3; }
+
+// Main grid: node list left, detail+console right
+.cluster-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+// Section title
+.cluster-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: $pt-text-color-muted;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid $gray4;
+}
+
+.bp6-dark .cluster-section-title {
+  color: $pt-dark-text-color-muted;
+  border-color: $dark-gray4;
+}
+
+// Node list
+.cluster-node-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cluster-node-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: $light-gray5;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+
+  &:hover { background: $light-gray4; }
+  &.cluster-node-card--selected {
+    background: rgba($blue3, 0.08);
+    border-color: $blue3;
+  }
+}
+
+.bp6-dark .cluster-node-card {
+  background: $dark-gray3;
+  &:hover { background: $dark-gray4; }
+  &.cluster-node-card--selected {
+    background: rgba($blue4, 0.12);
+    border-color: $blue4;
+  }
+}
+
+.cluster-node-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+}
+
+.cluster-node-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cluster-node-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: $pt-text-color;
+}
+
+.bp6-dark .cluster-node-name {
+  color: $pt-dark-text-color;
+}
+
+.cluster-node-group {
+  display: block;
+  font-size: 11px;
+  color: $pt-text-color-muted;
+  margin-top: 1px;
+}
+
+.bp6-dark .cluster-node-group {
+  color: $pt-dark-text-color-muted;
+}
+
+.cluster-node-meta {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.cluster-node-coords {
+  display: block;
+  font-size: 11px;
+  font-family: monospace;
+  color: $pt-text-color-muted;
+}
+
+.cluster-node-battery {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: $pt-text-color;
+  margin-top: 2px;
+}
+
+.bp6-dark .cluster-node-battery {
+  color: $pt-dark-text-color;
+}
+
+// Right panel
+.cluster-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// Detail card
+.cluster-detail-card {
+  padding: 16px 20px !important;
+}
+
+.cluster-detail-grid {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+}
+
+.cluster-detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 14px;
+  border-right: 1px solid $light-gray3;
+  font-size: 14px;
+  margin-bottom: 8px;
+
+  &:first-child { padding-left: 0; }
+  &:last-child { border-right: none; padding-right: 0; }
+}
+
+.bp6-dark .cluster-detail-col {
+  border-color: $dark-gray3;
+}
+
+.cluster-detail-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: $pt-text-color-muted;
+}
+
+.bp6-dark .cluster-detail-label {
+  color: $pt-dark-text-color-muted;
+}
+
+.cluster-detail-placeholder {
+  color: $pt-text-color-muted;
+  font-size: 14px;
+  margin: 0;
+}
+
+// Command console
+.cluster-console-card {
+  padding: 16px 20px !important;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cluster-console-log {
+  flex: 1;
+  max-height: 160px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.cluster-console-entry {
+  padding: 2px 0;
+  color: $gray3;
+
+  &.cluster-console-entry--error {
+    color: $red3;
+  }
+}
+
+.cluster-console-id {
+  color: $pt-text-color-disabled;
+  font-size: 11px;
+}
+
+.cluster-console-time {
+  color: $pt-text-color-muted;
+}
+
+.cluster-console-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cluster-console-prompt {
+  font-family: monospace;
+  font-size: 14px;
+  color: $green3;
+  font-weight: 600;
+}
+
+.cluster-console-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: monospace;
+  font-size: 14px;
+  color: $pt-text-color;
+  outline: none;
+  padding: 4px 0;
+
+  &::placeholder { color: $pt-text-color-muted; }
+}
+
+.bp6-dark .cluster-console-input {
+  color: $pt-dark-text-color;
+}
+
+// Broadcast Terminal
+.cluster-terminal-card {
+  padding: 16px 20px !important;
+}
+
+.cluster-terminal-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  color: $red3;
+  animation: cluster-badge-blink 1s step-end infinite;
+}
+
+@keyframes cluster-badge-blink {
+  50% { opacity: 0; }
+}
+
+.cluster-terminal {
+  background: $black;
+  border-radius: 4px;
+  padding: 14px 16px;
+  max-height: 260px;
+  overflow-y: auto;
+  font-family: 'Courier New', monospace;
+}
+
+.cluster-terminal-line {
+  font-size: 13px;
+  line-height: 1.6;
+  color: $green3;
+  white-space: pre-wrap;
+}
+
+.cluster-terminal-line--active {
+  color: $green4;
+}
+
+.cluster-terminal-cursor {
+  animation: cluster-cursor-blink 0.5s step-end infinite;
+  color: $green4;
+}
+
+@keyframes cluster-cursor-blink {
+  50% { opacity: 0; }
+}
 .global-loading-overlay {
   position: fixed;
   inset: 0;

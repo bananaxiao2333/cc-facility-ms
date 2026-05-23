@@ -174,6 +174,9 @@ const KEY_SESSIONS = "data_sessions";
 const KEY_SIDEBAR = "data_sidebar";
 const KEY_MAINTENANCE = "data_maintenance";
 const KEY_GROUPS = "data_groups";
+const KEY_CLUSTER_NODES = "data_cluster_nodes";
+const KEY_CLUSTER_COMMANDS = "data_cluster_commands";
+const KEY_CLUSTER_EVENTS = "data_cluster_events";
 
 const SESSION_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -1478,4 +1481,178 @@ export async function assertCanView(user, viewId) {
 
 export function roleRank(role) {
   return getRoleRank(role, []);
+}
+
+// ---- cluster nodes ----
+
+export async function loadNodes() {
+  const all = await loadCollection(KEY_CLUSTER_NODES);
+  return Object.values(all).filter(n => n && n.id);
+}
+
+export async function getNode(nodeId) {
+  const all = await loadCollection(KEY_CLUSTER_NODES);
+  return all[nodeId] || null;
+}
+
+export async function getNodeByToken(token) {
+  const all = await loadCollection(KEY_CLUSTER_NODES);
+  return Object.values(all).find(n => n && n.token === token) || null;
+}
+
+export async function registerNode({ name, groupId, token, base, clientUrl, configPath, clientPath, startupPath }) {
+  const all = await loadCollection(KEY_CLUSTER_NODES);
+  const id = makeId("node");
+  const node = {
+    id,
+    name: String(name || "").trim().slice(0, 32) || id,
+    groupId: groupId || null,
+    token: token || randomHex(32),
+    status: "offline",
+    battery: 0,
+    position: null,
+    task: null,
+    lastSeen: null,
+    base: base || "",
+    clientUrl: clientUrl || "",
+    configPath: configPath || "",
+    clientPath: clientPath || "",
+    startupPath: startupPath || "",
+    createdAt: now(),
+    updatedAt: now(),
+  };
+  all[id] = node;
+  await saveCollection(KEY_CLUSTER_NODES, all);
+  return node;
+}
+
+export async function updateNodeHeartbeat(nodeId, { battery, position }) {
+  const all = await loadCollection(KEY_CLUSTER_NODES);
+  const node = all[nodeId];
+  if (!node) return null;
+  node.status = "online";
+  if (battery !== undefined) node.battery = battery;
+  if (position) node.position = position;
+  node.lastSeen = now();
+  node.updatedAt = now();
+  all[nodeId] = node;
+  await saveCollection(KEY_CLUSTER_NODES, all);
+  return node;
+}
+
+export async function deleteNode(nodeId) {
+  const all = await loadCollection(KEY_CLUSTER_NODES);
+  if (!all[nodeId]) return false;
+  delete all[nodeId];
+  await saveCollection(KEY_CLUSTER_NODES, all);
+  return true;
+}
+
+export async function markNodeOffline(nodeId) {
+  const all = await loadCollection(KEY_CLUSTER_NODES);
+  const node = all[nodeId];
+  if (!node) return null;
+  node.status = "offline";
+  node.updatedAt = now();
+  all[nodeId] = node;
+  await saveCollection(KEY_CLUSTER_NODES, all);
+  return node;
+}
+
+// ---- cluster commands ----
+
+export async function queueCommand(nodeId, { type, priority, payload, createdBy }) {
+  const all = await loadCollection(KEY_CLUSTER_COMMANDS);
+  const id = makeId("cmd");
+  const cmd = {
+    id,
+    nodeId,
+    type: String(type || "report"),
+    priority: Number(priority) || 3,
+    payload: payload || {},
+    createdBy: createdBy || null,
+    status: "pending",
+    result: null,
+    createdAt: now(),
+    dispatchedAt: null,
+    completedAt: null,
+  };
+  all[id] = cmd;
+  await saveCollection(KEY_CLUSTER_COMMANDS, all);
+  return cmd;
+}
+
+export async function pollCommand(nodeId) {
+  const all = await loadCollection(KEY_CLUSTER_COMMANDS);
+  const pending = Object.values(all)
+    .filter(c => c && c.nodeId === nodeId && c.status === "pending")
+    .sort((a, b) => (b.priority || 3) - (a.priority || 3));
+  if (!pending.length) return null;
+  const cmd = pending[0];
+  cmd.status = "dispatched";
+  cmd.dispatchedAt = now();
+  all[cmd.id] = cmd;
+  await saveCollection(KEY_CLUSTER_COMMANDS, all);
+  return cmd;
+}
+
+export async function completeCommand(nodeId, cmdId, status, result) {
+  const all = await loadCollection(KEY_CLUSTER_COMMANDS);
+  const cmd = all[cmdId];
+  if (!cmd || cmd.nodeId !== nodeId) return null;
+  cmd.status = status; // "done" or "failed"
+  cmd.result = result || null;
+  cmd.completedAt = now();
+  all[cmdId] = cmd;
+  await saveCollection(KEY_CLUSTER_COMMANDS, all);
+
+  // Update node task state
+  const nodes = await loadCollection(KEY_CLUSTER_NODES);
+  const node = nodes[nodeId];
+  if (node) {
+    node.task = status === "done" ? null : "error";
+    node.updatedAt = now();
+    nodes[nodeId] = node;
+    await saveCollection(KEY_CLUSTER_NODES, nodes);
+  }
+  return cmd;
+}
+
+export async function listCommands(nodeId) {
+  const all = await loadCollection(KEY_CLUSTER_COMMANDS);
+  const list = Object.values(all).filter(c => c && c.nodeId === nodeId);
+  return list.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+// ---- cluster events ----
+
+export async function recordEvent(nodeId, type, message) {
+  const all = await loadCollection(KEY_CLUSTER_EVENTS);
+  const id = makeId("evt");
+  all[id] = { id, nodeId, type, message, createdAt: now() };
+  await saveCollection(KEY_CLUSTER_EVENTS, all);
+  return all[id];
+}
+
+export async function getEvents(nodeId, limit = 50) {
+  const all = await loadCollection(KEY_CLUSTER_EVENTS);
+  return Object.values(all)
+    .filter(e => e && (!nodeId || e.nodeId === nodeId))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, limit);
+}
+
+// ---- cluster maintenance ----
+
+const OFFLINE_THRESHOLD_MS = 30_000;
+
+export async function runClusterHeartbeat() {
+  const nodes = await loadNodes();
+  for (const node of nodes) {
+    if (!node.lastSeen) continue;
+    const elapsed = Date.now() - node.lastSeen;
+    if (elapsed > OFFLINE_THRESHOLD_MS && node.status === "online") {
+      await markNodeOffline(node.id);
+    }
+  }
 }

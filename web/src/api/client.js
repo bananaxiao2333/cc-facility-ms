@@ -13,12 +13,12 @@ function getToken() {
 }
 
 async function request(path, options = {}) {
-  const { body, method = 'GET' } = options;
+  const { body, method = 'GET', silent } = options;
   const headers = { 'Content-Type': 'application/json' };
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const rid = _start?.(path);
+  const rid = silent ? null : _start?.(path);
 
   try {
     const res = await fetch(`${BASE}${path}`, {
@@ -37,7 +37,7 @@ async function request(path, options = {}) {
 
     return data;
   } finally {
-    _finish?.(rid);
+    if (rid !== null) _finish?.(rid);
   }
 }
 
@@ -45,10 +45,22 @@ export function post(path, body) {
   return request(path, { method: 'POST', body });
 }
 
+export function postSilent(path, body) {
+  return request(path, { method: 'POST', body, silent: true });
+}
+
 export function get(path) {
   return request(path);
 }
 
+export function getSilent(path) {
+  return request(path, { silent: true });
+}
+
 export function patch(path, body) {
   return request(path, { method: 'PATCH', body });
+}
+
+export function del(path) {
+  return request(path, { method: 'DELETE' });
 }

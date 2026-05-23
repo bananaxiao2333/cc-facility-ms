@@ -31,13 +31,25 @@ export function AuthProvider({ children }) {
     setUser(data.user);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const data = await fetchMe();
+      setUser(data.user);
+    } catch (err) {
+      if (err.status === 401) {
+        localStorage.removeItem(TOKEN_KEY);
+        setUser(null);
+      }
+    }
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     setUser(null);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

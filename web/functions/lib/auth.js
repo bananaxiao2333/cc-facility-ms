@@ -119,6 +119,18 @@ export function requireAdmin(ctx) {
   }
 }
 
+// Validate a cluster node token (Bearer <raw-token>).
+import { getNodeByToken } from "./database.js";
+
+export async function requireNodeAuth(request) {
+  const header = request.headers.get("Authorization") || "";
+  const match = header.trim().match(/^Bearer\s+(.+)$/i);
+  if (!match) throw throwJson(401, "Missing node token");
+  const node = await getNodeByToken(match[1].trim());
+  if (!node) throw throwJson(401, "Invalid node token");
+  return node;
+}
+
 // Throw a structured error that handleError() will convert to a proper JSON Response.
 function throwJson(status, message) {
   return Object.assign(new Error(message), {
