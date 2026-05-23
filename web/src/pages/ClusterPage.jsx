@@ -1,26 +1,39 @@
 import { useState, useEffect, useRef } from 'react';
-import { Card, Button, Intent, Tag, MultistepDialog, DialogStep, DialogBody, FormGroup, InputGroup, HTMLSelect } from '@blueprintjs/core';
-import { fetchNodes, fetchNodesSilent, sendCommand, registerNode, deleteNode } from '../api/cluster';
-import turtleClientUrl from '@cc/turtle-client.lua?url';
+import { Card, Button, Intent, Tag, Dialog, DialogBody, DialogFooter, FormGroup, InputGroup, HTMLSelect } from '@blueprintjs/core';
+import { fetchNodes, fetchNodesSilent, sendCommand, registerNode, deleteNode, updateNode } from '../api/cluster';
+import { fetchGroups } from '../api/groups';
+import { useToast } from '../context/ToastContext';
+import clientUrl from '@cc/ccfms-client.lua?url';
 
 const STATUS_COLORS = { online: '#15b371', offline: '#cd4246', maintenance: '#c87619' };
 
-const GROUPS = [
-  { id: 'group_1', name: '奇点' },
-  { id: 'group_2', name: '星云' },
-  { id: 'group_3', name: '脉冲星' },
-  { id: 'group_4', name: '磁陀星' },
-];
+function groupName(groups, groupId) {
+  if (!groupId) return '—';
+  const g = groups.find(x => x.id === groupId);
+  return g ? g.name : groupId;
+}
 
 export default function ClusterPage() {
   const [nodes, setNodes] = useState([]);
+  const [groups, setGroups] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   const [cmdInput, setCmdInput] = useState('');
   const [cmdLog, setCmdLog] = useState([]);
   const [sending, setSending] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [polling, setPolling] = useState(false);
   const [regOpen, setRegOpen] = useState(false);
+  const [deployOpen, setDeployOpen] = useState(false);
+  const [deployCmd, setDeployCmd] = useState('');
+  const [deployToken, setDeployToken] = useState('');
+  const [deployNodeName, setDeployNodeName] = useState('');
+  const [editOpen, setEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editGroupId, setEditGroupId] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
   const firstLoad = useRef(true);
+  const toast = useToast();
+  const apiBase = import.meta.env.VITE_API_BASE || window.location.origin;
 
   const handleDelete = async (nodeId) => {
     setDeleting(true);
@@ -28,20 +41,40 @@ export default function ClusterPage() {
       await deleteNode(nodeId);
       setNodes(p => p.filter(n => n.id !== nodeId));
       if (selectedNode?.id === nodeId) setSelectedNode(null);
-    } catch { /* ignore */ }
+      toast.success('Node deleted');
+    } catch { toast.error('Failed to delete node'); }
     finally { setDeleting(false); }
+  };
+
+  const handleEditSave = async () => {
+    setEditSaving(true);
+    try {
+      const data = await updateNode(selectedNode.id, { name: editName, groupId: editGroupId || null });
+      setNodes(p => p.map(n => n.id === data.node.id ? data.node : n));
+      setSelectedNode(data.node);
+      setEditOpen(false);
+      toast.success('Node updated');
+    } catch { toast.error('Failed to update node'); }
+    finally { setEditSaving(false); }
   };
 
   useEffect(() => {
     const load = firstLoad.current ? fetchNodes : fetchNodesSilent;
     load().then(d => {
-      setNodes(d.nodes || []);
-      if (d.nodes?.length) setSelectedNode(p => p || d.nodes[0]);
+      const list = d.nodes || [];
+      setNodes(list);
+      setSelectedNode(p => list.find(n => n.id === p?.id) || list[0] || null);
     }).catch(() => {});
+    fetchGroups().then(d => setGroups(d.groups || [])).catch(() => {});
     firstLoad.current = false;
     const iv = setInterval(() => {
-      fetchNodesSilent().then(d => setNodes(d.nodes || [])).catch(() => {});
-    }, 5000);
+      setPolling(true);
+      fetchNodesSilent().then(d => {
+        const list = d.nodes || [];
+        setNodes(list);
+        setSelectedNode(p => list.find(n => n.id === p?.id) || (list[0] ?? p));
+      }).catch(() => {}).finally(() => setPolling(false));
+    }, 10000);
     return () => clearInterval(iv);
   }, []);
 
@@ -59,13 +92,15 @@ export default function ClusterPage() {
       const data = await sendCommand(selectedNode.id, type, payload);
       setCmdLog(p => [...p, { time: new Date().toLocaleTimeString(), text: `${type} → ${selectedNode.name}`, id: data.command?.id }]);
       setCmdInput('');
+      toast.success(`Command ${type} sent to ${selectedNode.name}`);
     } catch (err) {
+      toast.error(err.message);
       setCmdLog(p => [...p, { time: new Date().toLocaleTimeString(), text: `ERR: ${err.message}`, error: true }]);
     } finally { setSending(false); }
   };
 
-  const online = nodes.filter(n => n.status === 'online').length;
-  const offline = nodes.filter(n => n.status === 'offline').length;
+  const online = nodes.filter(n => n.online).length;
+  const offline = nodes.filter(n => !n.online).length;
 
   return (
     <div className="cluster-page">
@@ -74,6 +109,7 @@ export default function ClusterPage() {
         <span className="cluster-stat cluster-stat--online">Online: <strong>{online}</strong></span>
         <span className="cluster-stat cluster-stat--offline">Offline: <strong>{offline}</strong></span>
         <span className="cluster-stat">Idle: <strong>{nodes.length - online - offline}</strong></span>
+        <span className={'cluster-poll-indicator' + (polling ? ' cluster-poll-indicator--active' : '')} />
         <Button icon="plus" text="Register Node" intent={Intent.PRIMARY} small style={{ marginLeft: 'auto' }} onClick={() => setRegOpen(true)} />
       </div>
 
@@ -88,10 +124,10 @@ export default function ClusterPage() {
             <div key={node.id}
               className={'cluster-node-card' + (selectedNode?.id === node.id ? ' cluster-node-card--selected' : '')}
               onClick={() => { setSelectedNode(node); setCmdLog([]); }}>
-              <span className="cluster-node-dot" style={{ background: STATUS_COLORS[node.status] || '#8f99a8' }} />
+              <span className="cluster-node-dot" style={{ background: (node.online ? STATUS_COLORS.online : STATUS_COLORS.offline) || '#8f99a8' }} />
               <div className="cluster-node-info">
                 <span className="cluster-node-name">{node.name}</span>
-                <span className="cluster-node-group">{node.groupId || '—'} &middot; {node.task || 'idle'}</span>
+                <span className="cluster-node-group">{groupName(groups, node.groupId)} &middot; {node.task || 'idle'}</span>
               </div>
               <div className="cluster-node-meta">
                 {node.position && <span className="cluster-node-coords">{node.position.x}, {node.position.y}, {node.position.z}</span>}
@@ -108,14 +144,13 @@ export default function ClusterPage() {
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <h3 className="cluster-section-title" style={{ border: 'none', padding: 0, margin: 0 }}>{selectedNode.name}</h3>
-                  <Button icon="trash" text="Delete" intent={Intent.DANGER} small loading={deleting} onClick={() => handleDelete(selectedNode.id)} />
                 </div>
                 <div className="cluster-detail-grid" style={{ marginTop: 12 }}>
                   <DetailCol label="ID" value={selectedNode.id} />
-                  <DetailCol label="Group" value={selectedNode.groupId || '—'} />
+                  <DetailCol label="Group" value={groupName(groups, selectedNode.groupId)} />
                   <DetailCol label="Status">
-                    <Tag intent={selectedNode.status === 'online' ? Intent.SUCCESS : selectedNode.status === 'offline' ? Intent.DANGER : Intent.WARNING}>
-                      {selectedNode.status?.toUpperCase()}
+                    <Tag intent={selectedNode.online ? Intent.SUCCESS : Intent.WARNING}>
+                      {(selectedNode.online ? 'ONLINE' : 'OFFLINE')}
                     </Tag>
                   </DetailCol>
                   <DetailCol label="Battery" value={`${selectedNode.battery}%`} />
@@ -128,6 +163,27 @@ export default function ClusterPage() {
               <p className="cluster-detail-placeholder">Select a node to view details</p>
             )}
           </Card>
+
+          {/* Node Management */}
+          {selectedNode && (
+            <Card className="cluster-detail-card">
+              <h3 className="cluster-section-title">Manage Node</h3>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Button icon="send-to" text="Deploy" small onClick={() => {
+                  setDeployCmd(`wget run ${apiBase}/api/cluster/bootstrap?token=${selectedNode.token}`);
+                  setDeployToken(selectedNode.token);
+                  setDeployNodeName(selectedNode.name);
+                  setDeployOpen(true);
+                }} />
+                <Button icon="edit" text="Edit Info" small onClick={() => {
+                  setEditName(selectedNode.name);
+                  setEditGroupId(selectedNode.groupId || '');
+                  setEditOpen(true);
+                }} />
+                <Button icon="trash" text="Delete Node" intent={Intent.DANGER} small loading={deleting} onClick={() => handleDelete(selectedNode.id)} />
+              </div>
+            </Card>
+          )}
 
           <Card className="cluster-console-card">
             <h3 className="cluster-section-title">Command Console</h3>
@@ -151,10 +207,83 @@ export default function ClusterPage() {
       </div>
 
       {/* Register Node Dialog */}
-      <RegisterNodeDialog isOpen={regOpen} onClose={() => setRegOpen(false)} onDone={(node) => {
-        setNodes(p => [...p, node]);
-        setRegOpen(false);
-      }} />
+      <RegisterDialog
+        isOpen={regOpen}
+        groups={groups}
+        apiBase={apiBase}
+        clientUrl={clientUrl}
+        onClose={() => setRegOpen(false)}
+        onCreated={(node) => {
+          setNodes(p => [...p, node]);
+          setRegOpen(false);
+          toast.success(`Node ${node.name} registered`);
+          setDeployCmd(`wget run ${apiBase}/api/cluster/bootstrap?token=${node.token}`);
+          setDeployToken(node.token);
+          setDeployNodeName(node.name);
+          setDeployOpen(true);
+        }}
+      />
+
+      {/* Deploy Guide Dialog */}
+      <Dialog isOpen={deployOpen} onClose={() => setDeployOpen(false)} title={`Deploy Guide — ${deployNodeName}`} icon="send-to" style={{ width: 560 }}>
+        <DialogBody>
+          <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>One-Command Setup</h4>
+          <p style={{ fontSize: 13, color: 'var(--bp-palette-gray-3)', marginBottom: 8 }}>
+            Run this on your CC:Tweaked turtle to auto-install everything:
+          </p>
+          <pre style={{
+            background: 'var(--bp-palette-black)', color: 'var(--bp-palette-green-3)',
+            padding: 12, borderRadius: 4, fontSize: 13, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+          }}>{deployCmd}</pre>
+          <Button icon="clipboard" text="Copy" small style={{ marginTop: 8 }}
+            onClick={() => navigator.clipboard.writeText(deployCmd)} />
+
+          <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--bp-palette-gray-4)' }}>
+            <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Manual Setup</h4>
+            <p style={{ fontSize: 13, color: 'var(--bp-palette-gray-3)', marginBottom: 8 }}>
+              Or download and place the files manually:
+            </p>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <Button icon="download" text="config.lua" small onClick={() => {
+                  const snippet = `-- /etc/facility/config.lua\nreturn {\n  node_id = "${deployNodeName}",\n  token = "${deployToken}",\n  api_base = "${apiBase}",\n  heartbeat_interval = 10,\n}`;
+                  const b = new Blob([snippet], { type: 'text/plain' });
+                  const u = URL.createObjectURL(b);
+                  const a = document.createElement('a'); a.href = u; a.download = 'config.lua'; a.click();
+                  URL.revokeObjectURL(u);
+                }} />
+                <p style={{ fontSize: 11, color: 'var(--bp-palette-gray-4)', marginTop: 4 }}>Save to <code>/etc/facility/config.lua</code></p>
+              </div>
+              <div>
+                <Button icon="download" text="client.lua" small onClick={() => window.open(clientUrl, '_blank')} />
+                <p style={{ fontSize: 11, color: 'var(--bp-palette-gray-4)', marginTop: 4 }}>Save to <code>/facility/client.lua</code></p>
+              </div>
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--bp-palette-gray-3)', marginTop: 12 }}>
+              Then run: <code>shell.run("/facility/client.lua")</code>
+            </p>
+          </div>
+        </DialogBody>
+        <DialogFooter actions={<Button text="Done" intent={Intent.PRIMARY} onClick={() => setDeployOpen(false)} />} />
+      </Dialog>
+
+      {/* Edit Node Dialog */}
+      <Dialog isOpen={editOpen} onClose={() => setEditOpen(false)} title="Edit Node" icon="edit">
+        <DialogBody>
+          <FormGroup label="Name" labelFor="edit-name">
+            <InputGroup id="edit-name" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Node name" autoFocus />
+          </FormGroup>
+          <FormGroup label="Group">
+            <HTMLSelect value={editGroupId} onChange={e => setEditGroupId(e.target.value)} fill>
+              <option value="">— None —</option>
+              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </HTMLSelect>
+          </FormGroup>
+        </DialogBody>
+        <DialogFooter actions={
+          <><Button text="Cancel" onClick={() => setEditOpen(false)} /><Button text="Save" intent={Intent.PRIMARY} loading={editSaving} disabled={!editName.trim()} onClick={handleEditSave} /></>
+        } />
+      </Dialog>
     </div>
   );
 }
@@ -168,129 +297,51 @@ function DetailCol({ label, value, children }) {
   );
 }
 
-// ---- Multi-step Register Dialog ----
+// ---- Register Dialog ----
 
-function RegisterNodeDialog({ isOpen, onClose, onDone }) {
+function RegisterDialog({ isOpen, groups, apiBase, clientUrl, onClose, onCreated }) {
   const [name, setName] = useState('');
   const [groupId, setGroupId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [created, setCreated] = useState(null);
-  const [currentStep, setCurrentStep] = useState('info');
-  const apiBase = import.meta.env.VITE_API_BASE || window.location.origin;
 
-  const reset = () => { setName(''); setGroupId(''); setCreated(null); setCurrentStep('info'); };
+  const reset = () => { setName(''); setGroupId(''); };
 
-  const handleStepChange = (newStep, prevStep) => {
-    setCurrentStep(newStep);
-    if (newStep === 'deploy' && prevStep === 'info' && !created) {
-      setLoading(true);
-      registerNode({
+  const handleCreate = async () => {
+    if (!name.trim()) return;
+    setLoading(true);
+    try {
+      const data = await registerNode({
         name,
         groupId: groupId || null,
         base: apiBase,
-        clientUrl: turtleClientUrl,
+        clientUrl: clientUrl,
         configPath: '/etc/facility/config.lua',
         clientPath: '/facility/client.lua',
         startupPath: '/startup.lua',
-      })
-        .then(data => setCreated(data.node))
-        .catch(() => setCurrentStep('info'))
-        .finally(() => setLoading(false));
-    }
-  };
-
-  const configSnippet = created ? [
-    '-- /etc/facility/config.lua',
-    'return {',
-    `  node_id = "${created.id}",`,
-    `  token = "${created.token}",`,
-    `  api_base = "${apiBase}",`,
-    '  heartbeat_interval = 2,',
-    '}',
-  ].join('\n') : '';
-
-  const copyConfig = () => navigator.clipboard.writeText(configSnippet).catch(() => {});
-  const downloadConfig = () => {
-    const blob = new Blob([configSnippet], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'config.lua';
-    a.click();
-    URL.revokeObjectURL(url);
+      });
+      onCreated(data.node);
+      reset();
+    } catch {}
+    finally { setLoading(false); }
   };
 
   return (
-    <MultistepDialog
-      isOpen={isOpen}
-      onClose={() => { onClose(); setTimeout(reset, 300); }}
-      title="Register Cluster Node"
-      icon="plus"
-      navigationPosition="left"
-      canOutsideClickClose={false}
-      onChange={handleStepChange}
-      finalButtonProps={{
-        text: 'Done',
-        intent: 'success',
-        disabled: currentStep !== 'deploy',
-        onClick: () => { onDone(created); reset(); },
-      }}
-    >
-      <DialogStep
-        id="info"
-        title="Node Info"
-        panel={
-          <DialogBody>
-            <FormGroup label="Node Name" labelFor="reg-name">
-              <InputGroup id="reg-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. SCAN-01" autoFocus />
-            </FormGroup>
-            <FormGroup label="Group (optional)">
-              <HTMLSelect value={groupId} onChange={e => setGroupId(e.target.value)} fill>
-                <option value="">— None —</option>
-                {GROUPS.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </HTMLSelect>
-            </FormGroup>
-          </DialogBody>
-        }
-        nextButtonProps={{
-          text: 'Create Node',
-          intent: 'primary',
-          disabled: !name.trim(),
-        }}
-      />
-
-      <DialogStep
-        id="deploy"
-        title="Deploy"
-        panel={
-          <DialogBody>
-            <div style={{ fontSize: 14, lineHeight: 1.7 }}>
-              {loading && !created && <p style={{ color: 'var(--bp-palette-gray-3)' }}>Registering node...</p>}
-              {created && (<>
-              <p style={{ fontWeight: 600 }}>One-Command Setup</p>
-              <p>Run this on your CC:Tweaked turtle:</p>
-              <pre style={{
-                background: 'var(--bp-palette-black)', color: 'var(--bp-palette-green-3)',
-                padding: 12, borderRadius: 4, fontSize: 13, overflow: 'auto', whiteSpace: 'pre-wrap',
-              }}>{`wget run ${apiBase}/api/cluster/bootstrap?token=${created?.token}`}</pre>
-              <Button icon="clipboard" text="Copy Command" small
-                onClick={() => navigator.clipboard.writeText(`wget run ${apiBase}/api/cluster/bootstrap?token=${created?.token}`)} />
-
-              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--bp-palette-gray-4)' }}>
-                <p style={{ fontWeight: 600 }}>Manual Setup</p>
-                <p>Download and place these files on the turtle:</p>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <Button icon="download" text="config.lua" small onClick={downloadConfig} />
-                  <Button icon="download" text="turtle-client.lua" small onClick={() => window.open(turtleClientUrl, '_blank')} />
-                </div>
-                <p style={{ color: 'var(--bp-palette-gray-3)', marginTop: 8, fontSize: 13 }}>Save to <code>/etc/facility/config.lua</code> and <code>/facility/client.lua</code>, then run <code>shell.run("/facility/client.lua")</code>.</p>
-              </div>
-
-              </>)}
-            </div>
-          </DialogBody>
-        }
-      />
-    </MultistepDialog>
+    <Dialog isOpen={isOpen} onClose={() => { onClose(); setTimeout(reset, 300); }} title="Register Cluster Node" icon="plus">
+      <DialogBody>
+        <FormGroup label="Node Name" labelFor="reg-name">
+          <InputGroup id="reg-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. SCAN-01" autoFocus />
+        </FormGroup>
+        <FormGroup label="Group (optional)">
+          <HTMLSelect value={groupId} onChange={e => setGroupId(e.target.value)} fill>
+            <option value="">— None —</option>
+            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </HTMLSelect>
+        </FormGroup>
+      </DialogBody>
+      <DialogFooter actions={
+        <><Button text="Cancel" onClick={() => { onClose(); reset(); }} /><Button text="Create Node" intent={Intent.PRIMARY} loading={loading} disabled={!name.trim()} onClick={handleCreate} /></>
+      } />
+    </Dialog>
   );
 }
+

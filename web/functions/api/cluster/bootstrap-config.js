@@ -22,7 +22,7 @@ export async function onRequestGet(context) {
     `  node_id = "${node.id}",`,
     `  token = "${node.token}",`,
     `  api_base = "${base}",`,
-    "  heartbeat_interval = 2,",
+    "  heartbeat_interval = 10,",
     "}",
   ].join("\n");
 

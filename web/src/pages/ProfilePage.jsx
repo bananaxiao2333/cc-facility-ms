@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FormGroup, InputGroup, Button, Intent, Dialog, DialogBody, DialogFooter } from '@blueprintjs/core';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { updateProfile, changePassword } from '../api/auth';
 
 const GROUP_META = {
@@ -29,6 +30,7 @@ function fmtDate(ts) {
 
 export default function ProfilePage() {
   const { user, logout, refreshUser } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const group = getGroup(user.groupId);
 
@@ -52,8 +54,10 @@ export default function ProfilePage() {
       setDisplayName(data.user.displayName || '');
       await refreshUser();
       setNameMsg('Saved');
+      toast.success('Display name updated');
       setTimeout(() => setNameOpen(false), 800);
     } catch (e) {
+      toast.error(e.message);
       setNameMsg(e.message);
     } finally {
       setSavingName(false);
@@ -67,8 +71,10 @@ export default function ProfilePage() {
     try {
       await changePassword(currentPw, nextPw);
       setPwMsg('Password changed. Logging out...');
+      toast.success('Password changed — logging out');
       setTimeout(() => { logout(); navigate('/login'); }, 1500);
     } catch (e) {
+      toast.error(e.message);
       setPwMsg(e.message);
       setPwErr(true);
     } finally {

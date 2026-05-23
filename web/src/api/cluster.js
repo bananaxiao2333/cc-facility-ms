@@ -1,4 +1,4 @@
-import { get, getSilent, post, del } from './client';
+import { get, getSilent, post, del, patch } from './client';
 
 export function fetchNodes() {
   return get('/api/cluster/nodes');
@@ -14,6 +14,10 @@ export function registerNode(body) {
 
 export function deleteNode(nodeId) {
   return del(`/api/cluster/nodes/${encodeURIComponent(nodeId)}`);
+}
+
+export function updateNode(nodeId, body) {
+  return patch(`/api/cluster/nodes/${encodeURIComponent(nodeId)}`, body);
 }
 
 export function sendCommand(nodeId, type, payload, priority) {

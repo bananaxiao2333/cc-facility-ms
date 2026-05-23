@@ -84,7 +84,7 @@ export async function updateGroup(id, patch) {
 export async function deleteGroup(id) {
   const groups = await loadCollection(KEY_GROUPS);
   if (!groups[id]) throw new Error("组不存在。");
-  // Reassign members to no group
+  // Reassign users to no group
   const users = await loadCollection(KEY_USERS);
   for (const user of Object.values(users)) {
     if (user.groupId === id && user.role !== "admin") {
@@ -93,6 +93,15 @@ export async function deleteGroup(id) {
     }
   }
   await saveCollection(KEY_USERS, users);
+  // Reassign nodes to no group
+  const nodes = await loadCollection(KEY_CLUSTER_NODES);
+  for (const node of Object.values(nodes)) {
+    if (node && node.groupId === id) {
+      node.groupId = null;
+      node.updatedAt = now();
+    }
+  }
+  await saveCollection(KEY_CLUSTER_NODES, nodes);
   delete groups[id];
   await saveCollection(KEY_GROUPS, groups);
   return { deleted: id };
@@ -319,7 +328,7 @@ async function makePasswordHash(password) {
 }
 
 function now() {
-  return new Date().toISOString();
+  return Date.now();
 }
 
 function normalizeUsername(username) {
@@ -1485,19 +1494,33 @@ export function roleRank(role) {
 
 // ---- cluster nodes ----
 
+const ONLINE_WINDOW_MS = 30_000;
+
 export async function loadNodes() {
   const all = await loadCollection(KEY_CLUSTER_NODES);
-  return Object.values(all).filter(n => n && n.id);
+  const nowTs = Date.now();
+  return Object.values(all)
+    .filter(n => n && n.id)
+    .map(n => ({
+      ...n,
+      online: n.lastSeen ? (nowTs - n.lastSeen < ONLINE_WINDOW_MS) : false,
+    }));
+}
+
+function withOnline(node) {
+  if (!node) return null;
+  const ts = typeof node.lastSeen === 'number' ? node.lastSeen : Date.parse(node.lastSeen);
+  return { ...node, online: ts ? (Date.now() - ts < ONLINE_WINDOW_MS) : false };
 }
 
 export async function getNode(nodeId) {
   const all = await loadCollection(KEY_CLUSTER_NODES);
-  return all[nodeId] || null;
+  return withOnline(all[nodeId] || null);
 }
 
 export async function getNodeByToken(token) {
   const all = await loadCollection(KEY_CLUSTER_NODES);
-  return Object.values(all).find(n => n && n.token === token) || null;
+  return withOnline(Object.values(all).find(n => n && n.token === token) || null);
 }
 
 export async function registerNode({ name, groupId, token, base, clientUrl, configPath, clientPath, startupPath }) {
@@ -1530,7 +1553,6 @@ export async function updateNodeHeartbeat(nodeId, { battery, position }) {
   const all = await loadCollection(KEY_CLUSTER_NODES);
   const node = all[nodeId];
   if (!node) return null;
-  node.status = "online";
   if (battery !== undefined) node.battery = battery;
   if (position) node.position = position;
   node.lastSeen = now();
@@ -1546,6 +1568,18 @@ export async function deleteNode(nodeId) {
   delete all[nodeId];
   await saveCollection(KEY_CLUSTER_NODES, all);
   return true;
+}
+
+export async function updateNodeInfo(nodeId, { name, groupId }) {
+  const all = await loadCollection(KEY_CLUSTER_NODES);
+  const node = all[nodeId];
+  if (!node) return null;
+  if (name !== undefined) node.name = String(name).trim().slice(0, 32);
+  if (groupId !== undefined) node.groupId = groupId || null;
+  node.updatedAt = now();
+  all[nodeId] = node;
+  await saveCollection(KEY_CLUSTER_NODES, all);
+  return withOnline(node);
 }
 
 export async function markNodeOffline(nodeId) {

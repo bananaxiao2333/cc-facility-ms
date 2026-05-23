@@ -18,7 +18,7 @@ export async function onRequestGet(context) {
   const base        = node.base        || url.origin;
   const configPath  = node.configPath  || "/etc/facility/config.lua";
   const clientPath  = node.clientPath  || "/facility/client.lua";
-  const clientUrl   = node.clientUrl   || "/cc/turtle-client.lua";
+  const clientUrl   = node.clientUrl   || "/cc/ccfms-client.lua";
   const startupPath = node.startupPath || "/startup.lua";
 
   const configDir = configPath.substring(0, configPath.lastIndexOf("/"));
@@ -26,7 +26,7 @@ export async function onRequestGet(context) {
 
   const script = [
     "-- CCFMS Node Bootstrap",
-    "-- One-command deployment for CC:Tweaked turtles",
+    "-- One-command deployment for CC nodes",
     "",
     `local base        = "${base}"`,
     `local token       = "${token}"`,

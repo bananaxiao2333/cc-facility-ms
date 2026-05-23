@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApiLoading } from '../context/ApiLoadingContext';
 
+const MAX_DISPLAY_MS = 30_000;
+
 export default function GlobalLoading() {
   const { loading, current } = useApiLoading();
   const [visible, setVisible] = useState(false);
@@ -8,6 +10,7 @@ export default function GlobalLoading() {
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef(null);
   const timerRef = useRef(null);
+  const maxTimerRef = useRef(null);
 
   useEffect(() => {
     if (loading) {
@@ -18,11 +21,19 @@ export default function GlobalLoading() {
       timerRef.current = setInterval(() => {
         setElapsed((Date.now() - startRef.current) / 1000);
       }, 100);
+      // Safety: force-dismiss after MAX_DISPLAY_MS
+      maxTimerRef.current = setTimeout(() => {
+        setVisible(false);
+      }, MAX_DISPLAY_MS);
     } else {
       clearInterval(timerRef.current);
+      clearTimeout(maxTimerRef.current);
       if (mounted) setVisible(false);
     }
-    return () => clearInterval(timerRef.current);
+    return () => {
+      clearInterval(timerRef.current);
+      clearTimeout(maxTimerRef.current);
+    };
   }, [loading]);
 
   if (!mounted && !loading) return null;

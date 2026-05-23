@@ -21,6 +21,7 @@ export function AuthProvider({ children }) {
         if (err.status === 401) {
           localStorage.removeItem(TOKEN_KEY);
         }
+        // On transient errors, keep token — will retry next page load
       })
       .finally(() => setLoading(false));
   }, []);
@@ -40,6 +41,7 @@ export function AuthProvider({ children }) {
         localStorage.removeItem(TOKEN_KEY);
         setUser(null);
       }
+      throw err;
     }
   }, []);
 

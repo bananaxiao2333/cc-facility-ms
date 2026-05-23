@@ -7,7 +7,7 @@ export async function onRequestPost(context) {
     return json({
       success: true,
       message: "KV collections initialized",
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
     });
   } catch (error) {
     return handleError(error);

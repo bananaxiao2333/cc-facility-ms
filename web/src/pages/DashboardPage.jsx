@@ -3,6 +3,7 @@ import { H1, Card } from '@blueprintjs/core';
 import { useAuth } from '../context/AuthContext';
 import { fetchNodesSilent } from '../api/cluster';
 
+
 const ALARMS = [
   'SYSCHECK OK — ALL CONTAINMENT PROTOCOLS NOMINAL',
   'NOTICE — FACILITY POWER GRID OPERATIONAL',
@@ -47,17 +48,17 @@ function buildBroadcast(nodes) {
   const lines = ['CCFMS // Initializing facility diagnostic sweep...'];
   for (const n of nodes) {
     const pos = n.position ? ` [${n.position.x},${n.position.y},${n.position.z}]` : ' [GPS —]';
-    if (n.status === 'online') {
+    if (n.online) {
       lines.push(`CCFMS // Node ${n.name} — online, battery ${n.battery}%${pos}. Task: ${n.task || 'idle'}.`);
-    } else if (n.status === 'offline') {
+    } else if (!n.online) {
       const seen = n.lastSeen ? ` Last seen ${Math.round((Date.now() - n.lastSeen) / 1000)}s ago.` : '';
       lines.push(`CCFMS // Node ${n.name} — OFFLINE.${seen}`);
     } else {
-      lines.push(`CCFMS // Node ${n.name} — ${n.status}.`);
+      lines.push(`CCFMS // Node ${n.name} — ${n.online}.`);
     }
   }
-  const online = nodes.filter(n => n.status === 'online').length;
-  const offline = nodes.filter(n => n.status === 'offline').length;
+  const online = nodes.filter(n => n.online).length;
+  const offline = nodes.filter(n => !n.online).length;
   lines.push(`CCFMS // Sweep complete. ${online}/${nodes.length} operational.${offline ? ' ' + offline + ' offline.' : ''}`);
   lines.push('CCFMS // Standing by.');
   return lines;
@@ -82,12 +83,12 @@ export default function DashboardPage() {
     fetchNodesSilent().then(d => setNodes(d.nodes || [])).catch(() => {});
     const iv = setInterval(() => {
       fetchNodesSilent().then(d => setNodes(d.nodes || [])).catch(() => {});
-    }, 8000);
+    }, 10000);
     return () => clearInterval(iv);
   }, []);
 
-  const online = nodes.filter(n => n.status === 'online').length;
-  const offline = nodes.filter(n => n.status === 'offline').length;
+  const online = nodes.filter(n => n.online).length;
+  const offline = nodes.filter(n => !n.online).length;
 
   return (
     <div className="dashboard-page">

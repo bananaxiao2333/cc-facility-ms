@@ -1,77 +1,103 @@
 import { useState, useEffect } from 'react';
 import { Card, Button, Intent, Dialog, DialogBody, DialogFooter, FormGroup, InputGroup } from '@blueprintjs/core';
 import { fetchGroups, createGroup, updateGroup, deleteGroup } from '../api/groups';
+import { fetchNodesSilent } from '../api/cluster';
+import { useToast } from '../context/ToastContext';
+
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState([]);
+  const [nodes, setNodes] = useState([]);
   const [editOpen, setEditOpen] = useState(false);
-  const [editing, setEditing] = useState(null); // null = create, object = edit
+  const [editing, setEditing] = useState(null);
   const [name, setName] = useState('');
   const [alias, setAlias] = useState('');
   const [color, setColor] = useState('#666666');
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState({});
+  const toast = useToast();
 
-  const load = () => fetchGroups().then(d => setGroups(d.groups || [])).catch(() => {});
+  const load = () => {
+    fetchGroups().then(d => setGroups(d.groups || [])).catch(() => {});
+    fetchNodesSilent().then(d => setNodes(d.nodes || [])).catch(() => {});
+  };
 
   useEffect(() => { load(); }, []);
 
   const openCreate = () => {
     setEditing(null);
-    setName('');
-    setAlias('');
-    setColor('#666666');
+    setName(''); setAlias(''); setColor('#666666');
     setEditOpen(true);
   };
 
   const openEdit = (g) => {
     setEditing(g);
-    setName(g.name);
-    setAlias(g.alias || '');
-    setColor(g.color || '#666666');
+    setName(g.name); setAlias(g.alias || ''); setColor(g.color || '#666666');
     setEditOpen(true);
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (editing) {
-        await updateGroup(editing.id, { name, alias, color });
-      } else {
-        await createGroup({ name, alias, color });
-      }
+      editing ? await updateGroup(editing.id, { name, alias, color }) : await createGroup({ name, alias, color });
       setEditOpen(false);
       load();
-    } catch { /* ignore */ }
+      toast.success(editing ? 'Group updated' : 'Group created');
+    } catch { toast.error('Failed to save group'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
     await deleteGroup(id);
     load();
+    toast.success('Group deleted');
   };
+
+  const toggleExpand = (e, id) => { e.stopPropagation(); setExpanded(p => ({ ...p, [id]: !p[id] })); };
 
   return (
     <div>
       <div className="cluster-status-bar">
         <span className="cluster-stat">Groups: <strong>{groups.length}</strong></span>
+        <span className="cluster-stat">Nodes: <strong>{nodes.length}</strong></span>
         <Button icon="plus" text="New Group" intent={Intent.PRIMARY} small style={{ marginLeft: 'auto' }} onClick={openCreate} />
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-        {groups.map(g => (
-          <Card key={g.id} style={{ width: 220, padding: 16 }} onClick={() => openEdit(g)} className="cluster-node-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <span style={{ width: 14, height: 14, borderRadius: 3, background: g.color, flexShrink: 0 }} />
-              <span style={{ fontWeight: 600, fontSize: 15 }}>{g.name}</span>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--bp-palette-gray-3)', textTransform: 'uppercase', letterSpacing: 1 }}>
-              {g.alias || '—'}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--bp-palette-gray-4)', marginTop: 6 }}>
-              Created {g.createdAt ? new Date(g.createdAt).toLocaleDateString() : '—'}
-            </div>
-          </Card>
-        ))}
+      <div className="groups-grid">
+        {groups.map(g => {
+          const groupNodes = nodes.filter(n => n.groupId === g.id);
+          const showNodes = expanded[g.id] ? groupNodes : groupNodes.slice(0, 3);
+          return (
+            <Card key={g.id} onClick={() => openEdit(g)} className="groups-card">
+              <div className="groups-card-header">
+                <span style={{ width: 14, height: 14, borderRadius: 3, background: g.color, flexShrink: 0 }} />
+                <span className="groups-card-name">{g.name}</span>
+              </div>
+              <div className="groups-card-alias">{g.alias || '—'}</div>
+
+              {groupNodes.length > 0 && (
+                <>
+                  <h4 className="cluster-section-title" style={{ marginTop: 12 }}>Nodes — {groupNodes.length}</h4>
+                  <div className="groups-node-list">
+                    {showNodes.map(n => {
+                      return (
+                        <div key={n.id} className="groups-node-item">
+                          <span className="groups-node-dot" style={{ background: n.online ? '#15b371' : '#cd4246' }} />
+                          <span>{n.name}</span>
+                          <span className="groups-node-battery">{n.battery}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {groupNodes.length > 3 && (
+                    <Button minimal small text={expanded[g.id] ? 'Collapse' : `+${groupNodes.length - 3} more`}
+                      onClick={(e) => toggleExpand(e, g.id)} style={{ fontSize: 12, marginTop: 4 }} />
+                  )}
+                </>
+              )}
+            </Card>
+          );
+        })}
         {groups.length === 0 && (
           <p className="cluster-detail-placeholder">No groups defined. Click "New Group" to create one.</p>
         )}

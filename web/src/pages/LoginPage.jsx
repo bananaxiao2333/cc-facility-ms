@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, FormGroup, InputGroup, Button, Intent } from '@blueprintjs/core';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 const MODE_META = {
   auto:  { icon: 'contrast',     label: 'Auto' },
@@ -13,6 +14,7 @@ const MODE_META = {
 export default function LoginPage() {
   const { login } = useAuth();
   const { mode, cycle } = useTheme();
+  const toast = useToast();
   const navigate = useNavigate();
   const location = useLocation();
   const [username, setUsername] = useState('');
@@ -29,8 +31,10 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(username, password);
+      toast.success('Login successful');
       navigate(from, { replace: true });
     } catch (err) {
+      toast.error(err.message);
       setError(err.message);
     } finally {
       setSubmitting(false);
